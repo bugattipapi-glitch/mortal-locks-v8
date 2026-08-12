@@ -4,6 +4,7 @@ import { StatusPill } from '../components/StatusPill';
 import { commentaryRules } from '../lib/data';
 import { getRuntimeSnapshot, type RuntimePick } from '../lib/runtime-data';
 import { buildBroadcastRecap, calculatePlayerStreaks } from '../lib/broadcast';
+import { PlayerAvatar } from '../components/PlayerAvatar';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,7 @@ export default async function HomePage() {
             </div>
             {weekRows.map(({ player, picks }) => (
               <div className="pick-row" key={player.slug}>
-                <div className="player-cell"><span className="avatar">{player.avatar}</span><b>{player.name}</b></div>
+                <div className="player-cell"><PlayerAvatar name={player.name} /><b>{player.name}</b></div>
                 {pickCell(picks.find((pick) => pick.slot === 1), `${player.slug}-1`)}
                 {pickCell(picks.find((pick) => pick.slot === 2), `${player.slug}-2`)}
                 <div className="results-cell">
@@ -63,7 +64,7 @@ export default async function HomePage() {
             {weekRows.map(({ player, picks }) => (
               <article className="mobile-pick-card" key={player.slug}>
                 <div className="mobile-player">
-                  <span className="avatar">{player.avatar}</span><strong>{player.name}</strong>
+                  <PlayerAvatar name={player.name} /><strong>{player.name}</strong>
                   {picks.find((pick) => pick.commentary) && <em>{picks.find((pick) => pick.commentary)?.commentary}</em>}
                 </div>
                 {[1, 2].map((slot) => {
@@ -98,7 +99,7 @@ export default async function HomePage() {
                 return (
                 <div className={`standing-row ${streak ? `streak-${streak.direction}` : ''}`} key={player.name}>
                   <span className="rank">{index + 1}</span>
-                  <span className="avatar tiny">{player.name.slice(0, 2).toUpperCase()}</span>
+                  <PlayerAvatar name={player.name} size="tiny" />
                   <b>{player.name}</b>
                   {streak && <em className="streak-badge">{streak.direction === 'hot' ? 'HOT' : 'COLD'} ×{streak.length}</em>}
                   <span>{player.wins}-{player.losses}{player.pushes ? `-${player.pushes}` : ''}</span>

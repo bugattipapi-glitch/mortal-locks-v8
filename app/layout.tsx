@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Barlow_Condensed, Russo_One } from 'next/font/google';
+import { Barlow_Condensed, Press_Start_2P, Russo_One } from 'next/font/google';
 import './globals.css';
 
 const broadcastFont = Barlow_Condensed({
@@ -16,6 +16,13 @@ const displayFont = Russo_One({
   display: 'swap'
 });
 
+const pixelFont = Press_Start_2P({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-pixel',
+  display: 'swap'
+});
+
 export const metadata: Metadata = {
   title: 'Mortal Locks 8: The Ocho',
   description: 'The public-access home of Mortal Locks.'
@@ -23,7 +30,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${broadcastFont.variable} ${displayFont.variable}`}>
+    <html lang="en" className={`${broadcastFont.variable} ${displayFont.variable} ${pixelFont.variable}`}>
       <body>{children}</body>
     </html>
   );

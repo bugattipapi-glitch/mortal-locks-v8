@@ -45,10 +45,6 @@ export function ScoreTicker() {
             <div><b>{score.home}</b> {score.homeScore}</div>
           </div>
         ))}
-        <div className="score-chip muted-chip">
-          <div className="score-state">MANUAL RESULT MODE</div>
-          <div>The commissioner can grade every pick now. Live sports-data automation is the next broadcast upgrade.</div>
-        </div>
       </div>
     </section>
   );

@@ -22,12 +22,12 @@ export default function HallOfFamePage() {
         <div className="subsection-heading"><span>LEGACY ACHIEVEMENTS</span><small>DERIVED FROM {archivedPickCount.toLocaleString()} ARCHIVED PICKS</small></div>
         <div className="accolade-grid">
           {accolades.map((award) => (
-            <article className={`accolade-card accolade-${award.tone}`} key={award.title}>
+            <article className={`accolade-card accolade-${award.tone} ${award.title === 'IRON LOCK' ? 'iron-lock-card' : ''}`} key={award.title}>
               <span className="achievement-icon" aria-hidden="true">★</span><small>ACHIEVEMENT UNLOCKED</small><h2>{award.title}</h2><strong>{award.player}</strong><b>{award.stat}</b><p>{award.detail}</p>
             </article>
           ))}
         </div>
-        <div className="subsection-heading"><span>TEAM TROPHIES</span><small>EIGHT-PICK QUALIFYING MINIMUM</small></div>
+        <div className="subsection-heading"><span>TEAM TROPHIES</span></div>
         <div className="accolade-grid team-accolade-grid">
           {teamAccolades.map((award) => (
             <article className={`accolade-card accolade-${award.tone}`} key={award.title}>

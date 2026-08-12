@@ -4,40 +4,14 @@ import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BroadcastRecap as BroadcastRecapData } from '../lib/broadcast';
 
-function tone(context: AudioContext, frequency: number, start: number, duration: number, volume: number, type: OscillatorType = 'square') {
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-  oscillator.type = type;
-  oscillator.frequency.setValueAtTime(frequency, start);
-  gain.gain.setValueAtTime(volume, start);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  oscillator.connect(gain).connect(context.destination);
-  oscillator.start(start);
-  oscillator.stop(start + duration);
-}
+const BOOTH_TRACK = '/assets/audio/booth-sports-loop.mp3';
+const BLIPS = ['/assets/audio/dialogue-blip-a.ogg', '/assets/audio/dialogue-blip-b.ogg'] as const;
+const ADVANCE_SOUND = '/assets/audio/dialogue-advance.ogg';
 
-function startTheme(context: AudioContext) {
-  const melody = [196, 247, 294, 392, 330, 294, 247, 392];
-  const started = context.currentTime + 0.03;
-  melody.forEach((frequency, index) => {
-    tone(context, frequency, started + index * 0.19, 0.16, 0.025, 'square');
-    if (index % 2 === 0) tone(context, frequency / 2, started + index * 0.19, 0.3, 0.018, 'triangle');
-  });
-}
-
-function scheduleBroadcastBed(context: AudioContext) {
-  const bass = [98, 98, 123.47, 146.83, 98, 130.81, 146.83, 123.47];
-  const started = context.currentTime + 0.03;
-  bass.forEach((frequency, index) => {
-    tone(context, frequency, started + index * 0.24, 0.19, 0.006, 'triangle');
-    if (index % 2 === 0) tone(context, frequency * 2, started + index * 0.24, 0.08, 0.0035, 'square');
-  });
-}
-
-function chatter(context: AudioContext) {
-  const now = context.currentTime;
-  tone(context, 105 + Math.random() * 45, now, 0.045, 0.012, 'square');
-  tone(context, 205 + Math.random() * 80, now + 0.018, 0.035, 0.008, 'triangle');
+function resetMedia(media: HTMLAudioElement | null) {
+  if (!media) return;
+  media.pause();
+  media.currentTime = 0;
 }
 
 export function BroadcastRecap({ recap }: { recap: BroadcastRecapData }) {
@@ -48,42 +22,71 @@ export function BroadcastRecap({ recap }: { recap: BroadcastRecapData }) {
   const [frame, setFrame] = useState(0);
   const [gesture, setGesture] = useState(false);
   const [soundStarted, setSoundStarted] = useState(false);
-  const audio = useRef<AudioContext | null>(null);
-  const musicTimer = useRef<number | null>(null);
-
-  const ensureAudio = useCallback(() => {
-    audio.current ??= new AudioContext();
-    void audio.current.resume();
-    return audio.current;
-  }, []);
-
-  const stopMusic = useCallback(() => {
-    if (musicTimer.current !== null) window.clearInterval(musicTimer.current);
-    musicTimer.current = null;
-  }, []);
+  const [audioReady, setAudioReady] = useState(false);
+  const music = useRef<HTMLAudioElement | null>(null);
+  const blips = useRef<HTMLAudioElement[]>([]);
+  const blipCursor = useRef(0);
+  const advanceSound = useRef<HTMLAudioElement | null>(null);
 
   const startAudio = useCallback(() => {
-    const context = ensureAudio();
-    stopMusic();
+    if (!music.current) return false;
     setMuted(false);
     setSoundStarted(true);
-    startTheme(context);
-    scheduleBroadcastBed(context);
-    musicTimer.current = window.setInterval(() => scheduleBroadcastBed(context), 1920);
-  }, [ensureAudio, stopMusic]);
+    music.current.muted = false;
+    music.current.volume = 0.24;
+    void music.current.play().catch(() => setSoundStarted(false));
+    return true;
+  }, []);
+
+  const stopAudio = useCallback(() => {
+    resetMedia(music.current);
+    setSoundStarted(false);
+  }, []);
 
   const closeBroadcast = useCallback(() => {
-    stopMusic();
+    stopAudio();
     setOpen(false);
-  }, [stopMusic]);
+  }, [stopAudio]);
 
   const launch = useCallback((withAudio = true) => {
     setOpen(true);
     setLine(0);
     setCharacters(0);
-    setSoundStarted(withAudio);
-    if (withAudio) startAudio();
+    if (withAudio && !startAudio()) setSoundStarted(true);
   }, [startAudio]);
+
+  const playDialogueBlip = useCallback(() => {
+    if (!soundStarted || muted || !blips.current.length) return;
+    const sound = blips.current[blipCursor.current % blips.current.length];
+    blipCursor.current += 1;
+    sound.currentTime = 0;
+    sound.volume = 0.38;
+    sound.playbackRate = 0.88 + Math.random() * 0.25;
+    void sound.play().catch(() => undefined);
+  }, [muted, soundStarted]);
+
+  useEffect(() => {
+    music.current = new Audio(BOOTH_TRACK);
+    music.current.loop = true;
+    music.current.preload = 'auto';
+    blips.current = BLIPS.map((src) => {
+      const sound = new Audio(src);
+      sound.preload = 'auto';
+      return sound;
+    });
+    advanceSound.current = new Audio(ADVANCE_SOUND);
+    advanceSound.current.preload = 'auto';
+    setAudioReady(true);
+    return () => {
+      resetMedia(music.current);
+      blips.current.forEach(resetMedia);
+      resetMedia(advanceSound.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (open && soundStarted && audioReady && music.current?.paused) startAudio();
+  }, [audioReady, open, soundStarted, startAudio]);
 
   useEffect(() => {
     const replay = () => launch(true);
@@ -100,19 +103,15 @@ export function BroadcastRecap({ recap }: { recap: BroadcastRecapData }) {
   useEffect(() => {
     if (!open) return;
     const message = recap.lines[line] ?? '';
-    if (characters < message.length) {
-      const timer = window.setTimeout(() => {
-        setCharacters((count) => count + 1);
-        setFrame((value) => value ? 0 : 1);
-        if (characters % 2 === 0 && audio.current && soundStarted && !muted) chatter(audio.current);
-      }, /[.,!]/.test(message[characters] ?? '') ? 115 : 34);
-      return () => window.clearTimeout(timer);
-    }
-    if (line < recap.lines.length - 1) {
-      const timer = window.setTimeout(() => { setLine((value) => value + 1); setCharacters(0); }, 1250);
-      return () => window.clearTimeout(timer);
-    }
-  }, [characters, line, muted, open, recap.lines, soundStarted]);
+    if (characters >= message.length) return;
+    const character = message[characters] ?? '';
+    const timer = window.setTimeout(() => {
+      setCharacters((count) => count + 1);
+      setFrame((value) => value ? 0 : 1);
+      if (character.trim() && characters % 2 === 0) playDialogueBlip();
+    }, /[.,!?]/.test(character) ? 240 : 72);
+    return () => window.clearTimeout(timer);
+  }, [characters, line, open, playDialogueBlip, recap.lines]);
 
   useEffect(() => {
     if (!open) return;
@@ -123,29 +122,55 @@ export function BroadcastRecap({ recap }: { recap: BroadcastRecapData }) {
     return () => window.clearInterval(flicker);
   }, [open]);
 
-  useEffect(() => () => { stopMusic(); void audio.current?.close(); }, [stopMusic]);
-
   if (!open) return null;
   const current = recap.lines[line] ?? '';
-  const finished = line === recap.lines.length - 1 && characters >= current.length;
+  const lineTyped = characters >= current.length;
+  const finished = line === recap.lines.length - 1 && lineTyped;
+
+  const advance = () => {
+    if (!lineTyped) {
+      setCharacters(current.length);
+      return;
+    }
+    if (line < recap.lines.length - 1) {
+      setLine((value) => value + 1);
+      setCharacters(0);
+      if (soundStarted && !muted && advanceSound.current) {
+        advanceSound.current.currentTime = 0;
+        advanceSound.current.volume = 0.32;
+        void advanceSound.current.play().catch(() => undefined);
+      }
+    }
+  };
+
+  const toggleSound = () => {
+    if (soundStarted && !muted) {
+      setMuted(true);
+      if (music.current) music.current.muted = true;
+    } else {
+      startAudio();
+    }
+  };
 
   return (
     <div className="recap-overlay" role="dialog" aria-modal="true" aria-label="This Week in Mortal Locks">
       <button className="recap-backdrop" aria-label="Close weekly recap" onClick={closeBroadcast} />
       <section className="recap-console">
-        <div className="recap-toolbar"><span>{recap.eyebrow}</span><div><button onClick={() => { if (soundStarted && !muted) { stopMusic(); setMuted(true); void audio.current?.suspend(); } else { startAudio(); } }}>{soundStarted && !muted ? 'SOUND ON' : 'SOUND OFF'}</button><button onClick={closeBroadcast}>END BROADCAST ×</button></div></div>
-        <div className={`recap-screen recap-frame-${frame} ${gesture ? 'recap-gesture' : ''}`}>
+        <button className="recap-close" type="button" aria-label="Close weekly recap" onClick={closeBroadcast}>×</button>
+        <div className="recap-toolbar"><span>{recap.eyebrow}</span><button onClick={toggleSound}>{soundStarted && !muted ? '♪ SOUND ON' : 'SOUND OFF'}</button></div>
+        <button className={`recap-screen recap-frame-${frame} ${gesture ? 'recap-gesture' : ''}`} type="button" aria-label={finished ? 'Recap complete' : lineTyped ? 'Continue recap' : 'Show the rest of this line'} onClick={advance}>
           <Image className="recap-frame recap-frame-a" src="/assets/booth-recap-a.jpg" alt="Pixel-art Mortal Locks announcer in the booth" fill priority sizes="(max-width: 820px) 96vw, 940px" />
           <Image className="recap-frame recap-frame-b" src="/assets/booth-recap-b.jpg" alt="" fill priority sizes="(max-width: 820px) 96vw, 940px" aria-hidden="true" />
           <Image className="recap-frame recap-frame-gesture" src="/assets/booth-recap-gesture.jpg" alt="" fill priority sizes="(max-width: 820px) 96vw, 940px" aria-hidden="true" />
-          <div className="recap-copy"><span>{current.slice(0, characters)}</span><i aria-hidden="true" /></div>
-          <div className="recap-scanlines" aria-hidden="true" />
-        </div>
+          <span className="recap-copy"><span>{current.slice(0, characters)}</span><i aria-hidden="true" /></span>
+          {lineTyped && !finished ? <span className="recap-continue">CLICK / TAP TO CONTINUE ▶</span> : null}
+          <span className="recap-scanlines" aria-hidden="true" />
+        </button>
         <div className="recap-controls">
           <span>LINE {line + 1}/{recap.lines.length}</span>
-          <div className="recap-progress">{recap.lines.map((_, index) => <i className={index <= line ? 'active' : ''} key={index} />)}</div>
-          {soundStarted && !muted ? <button onClick={() => startTheme(ensureAudio())}>♪ REPLAY STINGER</button> : <button onClick={startAudio}>TAP FOR SOUND</button>}
-          {finished && <button onClick={closeBroadcast}>BACK TO THE BOARD →</button>}
+          <span className="recap-progress">{recap.lines.map((_, index) => <i className={index <= line ? 'active' : ''} key={index} />)}</span>
+          {!soundStarted || muted ? <button onClick={() => startAudio()}>TAP FOR SOUND</button> : null}
+          {finished ? <button onClick={closeBroadcast}>BACK TO THE BOARD →</button> : null}
         </div>
       </section>
     </div>

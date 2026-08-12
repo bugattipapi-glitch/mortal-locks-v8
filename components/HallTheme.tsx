@@ -1,35 +1,49 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-function note(context: AudioContext, frequency: number, start: number, duration: number, gainValue: number) {
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-  oscillator.type = 'triangle';
-  oscillator.frequency.setValueAtTime(frequency, start);
-  gain.gain.setValueAtTime(gainValue, start);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  oscillator.connect(gain).connect(context.destination);
-  oscillator.start(start);
-  oscillator.stop(start + duration);
-}
+const HALL_TRACK = '/assets/audio/hall-fanfare.mp3';
 
 export function HallTheme() {
   const [playing, setPlaying] = useState(false);
-  const contextRef = useRef<AudioContext | null>(null);
-  const play = () => {
-    contextRef.current ??= new AudioContext();
-    const context = contextRef.current;
-    void context.resume();
-    const start = context.currentTime + 0.03;
-    const fanfare = [261.63, 329.63, 392, 523.25, 440, 523.25, 659.25, 783.99];
-    fanfare.forEach((frequency, index) => {
-      note(context, frequency, start + index * 0.22, 0.2, 0.04);
-      if (index % 2 === 0) note(context, frequency / 2, start + index * 0.22, 0.38, 0.026);
-    });
-    setPlaying(true);
-    window.setTimeout(() => setPlaying(false), 2100);
+  const [blocked, setBlocked] = useState(false);
+  const audio = useRef<HTMLAudioElement | null>(null);
+
+  const play = useCallback(() => {
+    if (!audio.current) return;
+    audio.current.muted = false;
+    audio.current.volume = 0.3;
+    void audio.current.play()
+      .then(() => { setPlaying(true); setBlocked(false); })
+      .catch(() => { setPlaying(false); setBlocked(true); });
+  }, []);
+
+  const toggle = () => {
+    if (!audio.current) return;
+    if (playing) {
+      audio.current.pause();
+      setPlaying(false);
+    } else {
+      play();
+    }
   };
-  useEffect(() => () => { void contextRef.current?.close(); }, []);
-  return <button className="hall-theme-button" onClick={play}>{playing ? '♪ FANFARE PLAYING' : '▶ PLAY HALL FANFARE'}</button>;
+
+  useEffect(() => {
+    const soundtrack = new Audio(HALL_TRACK);
+    soundtrack.loop = true;
+    soundtrack.preload = 'auto';
+    audio.current = soundtrack;
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    soundtrack.addEventListener('play', onPlay);
+    soundtrack.addEventListener('pause', onPause);
+    play();
+    return () => {
+      soundtrack.pause();
+      soundtrack.removeEventListener('play', onPlay);
+      soundtrack.removeEventListener('pause', onPause);
+    };
+  }, [play]);
+
+  return <button className="hall-theme-button" onClick={toggle}>{playing ? '■ HALL FANFARE ON' : blocked ? '▶ TAP FOR HALL FANFARE' : '▶ PLAY HALL FANFARE'}</button>;
 }

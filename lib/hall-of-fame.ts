@@ -79,7 +79,6 @@ const teamRecords = (() => {
   }));
 })();
 
-// Eight picks keeps the team awards meaningful without rewarding a one-off flier.
 const qualifiedTeamRecords = teamRecords.filter((record) => record.picks >= 8);
 const bestTeam = [...qualifiedTeamRecords].sort((a, b) => b.pct - a.pct || b.picks - a.picks)[0];
 const worstTeam = [...qualifiedTeamRecords].sort((a, b) => a.pct - b.pct || b.picks - a.picks)[0];
@@ -161,6 +160,13 @@ export type Accolade = {
 
 export const accolades: Accolade[] = [
   {
+    title: 'IRON LOCK',
+    player: ironLock.name,
+    stat: `${ironLock.wins} ALL-TIME WINS`,
+    detail: `No one has cashed more recorded Mortal Locks picks across Seasons ${ironLock.seasons.join(', ')}.`,
+    tone: 'gold',
+  },
+  {
     title: 'UNDER TAKER',
     player: underCounts[0].name,
     stat: `${underCounts[0].count} UNDERS`,
@@ -228,13 +234,6 @@ export const accolades: Accolade[] = [
     player: 'Brad',
     stat: `${brad.wins}-${brad.losses}-${brad.pushes}`,
     detail: 'One win above the break-even line after 144 recorded picks. Every pixel counts.',
-    tone: 'gold',
-  },
-  {
-    title: 'IRON LOCK',
-    player: ironLock.name,
-    stat: `${ironLock.wins} ALL-TIME WINS`,
-    detail: `No one has cashed more recorded Mortal Locks picks across Seasons ${ironLock.seasons.join(', ')}.`,
     tone: 'gold',
   },
 ];

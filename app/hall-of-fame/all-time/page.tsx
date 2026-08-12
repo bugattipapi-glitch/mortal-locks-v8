@@ -1,6 +1,7 @@
 import { HallNav } from '../../../components/HallNav';
 import { SiteShell } from '../../../components/SiteShell';
 import { allTimeStandings, displayPct, mostPickedTeams } from '../../../lib/hall-of-fame';
+import { PlayerAvatar } from '../../../components/PlayerAvatar';
 
 export default function AllTimeBoardPage() {
   return (
@@ -16,7 +17,7 @@ export default function AllTimeBoardPage() {
           <div className="alltime-row alltime-head"><span>RK</span><span></span><b>PLAYER</b><span>RECORD</span><span>WIN %</span><small>SEASONS</small></div>
           {allTimeStandings.map((record, index) => (
             <div className={`alltime-row ${index < 3 ? `podium podium-${index + 1}` : ''}`} key={record.name}>
-              <span>{index + 1}</span><span className="avatar tiny">{record.name.slice(0, 2).toUpperCase()}</span><b>{record.name}</b>
+              <span>{index + 1}</span><PlayerAvatar name={record.name} size="tiny" /><b>{record.name}</b>
               <span>{record.wins}-{record.losses}-{record.pushes}</span><span>{displayPct(record.pct)}</span><small>ML {record.seasons.join(', ')}</small>
             </div>
           ))}

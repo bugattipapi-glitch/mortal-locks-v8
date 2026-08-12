@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { historicalSeasons, historicalSeasonNumbers } from '../lib/history';
+import { PlayerAvatar } from './PlayerAvatar';
 
 function pushNeutralPct(wins: number, losses: number) {
   return wins + losses ? wins / (wins + losses) : 0;
@@ -56,7 +57,7 @@ export function TapeVault() {
               const picks = weekPicks.filter((pick) => pick.player === name).sort((a, b) => a.slot - b.slot);
               return (
                 <article className="history-player-row" key={name}>
-                  <div className="history-name"><span className="avatar">{name.slice(0, 2).toUpperCase()}</span><b>{name}</b></div>
+                  <div className="history-name"><PlayerAvatar name={name} /><b>{name}</b></div>
                   {[0, 1].map((index) => {
                     const pick = picks[index];
                     return (
@@ -76,7 +77,7 @@ export function TapeVault() {
             {season.roster.map((name) => <button key={name} className={availablePlayer === name ? 'selected' : ''} onClick={() => setPlayer(name)}>{name}</button>)}
           </div>
           <div className="historical-player-summary">
-            <div><span className="avatar xl">{availablePlayer.slice(0, 2).toUpperCase()}</span><div><small>MORTAL LOCKS {season.number}</small><h2>{availablePlayer}</h2></div></div>
+            <div><PlayerAvatar name={availablePlayer} size="xl" /><div><small>MORTAL LOCKS {season.number}</small><h2>{availablePlayer}</h2></div></div>
             {season.records[availablePlayer] && (
               <strong>{season.records[availablePlayer].wins}-{season.records[availablePlayer].losses}-{season.records[availablePlayer].pushes} · {displayPct(pushNeutralPct(season.records[availablePlayer].wins, season.records[availablePlayer].losses))}</strong>
             )}

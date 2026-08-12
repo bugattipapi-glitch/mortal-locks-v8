@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { RuntimeSnapshot } from '../lib/runtime-data';
 import { StatusPill } from './StatusPill';
+import { PlayerAvatar } from './PlayerAvatar';
 
 const weeks = Array.from({ length: 18 }, (_, index) => index + 1);
 
@@ -36,7 +37,7 @@ export function SeasonExplorer({ snapshot }: { snapshot: RuntimeSnapshot }) {
               const picks = snapshot.picks.filter((pick) => pick.week === week && pick.playerSlug === player.slug).sort((a, b) => a.slot - b.slot);
               return (
                 <article className={`season-pick-card ${picks.length ? '' : 'empty-season-card'}`} key={player.slug}>
-                  <div className="season-player"><span className="avatar">{player.avatar}</span><strong>{player.name}</strong></div>
+                  <div className="season-player"><PlayerAvatar name={player.name} /><strong>{player.name}</strong></div>
                   {[1, 2].map((slot) => {
                     const pick = picks.find((item) => item.slot === slot);
                     return (
@@ -60,7 +61,7 @@ export function SeasonExplorer({ snapshot }: { snapshot: RuntimeSnapshot }) {
             {players.map((player) => <button key={player.slug} className={player.slug === selectedPlayer.slug ? 'selected' : ''} onClick={() => setPlayerSlug(player.slug)}>{player.name}</button>)}
           </div>
           <div className="player-profile">
-            <div className="profile-head"><span className="avatar xl">{selectedPlayer.avatar}</span><div><small>PLAYER FILE</small><h2>{selectedPlayer.name}</h2><p>Every pick and result stays visible here throughout the season.</p></div></div>
+            <div className="profile-head"><PlayerAvatar name={selectedPlayer.name} size="xl" /><div><small>PLAYER FILE</small><h2>{selectedPlayer.name}</h2><p>Every pick and result stays visible here throughout the season.</p></div></div>
             <div className="player-week-list">
               {weeks.map((number) => {
                 const picks = playerPicks.filter((pick) => pick.week === number).sort((a, b) => a.slot - b.slot);

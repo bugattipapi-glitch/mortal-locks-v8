@@ -13,6 +13,7 @@ import {
 import { commentaryRules } from '../lib/data';
 import type { RuntimeSnapshot } from '../lib/runtime-data';
 import { parseTextPicks } from '../lib/pick-text-parser';
+import { PlayerAvatar } from './PlayerAvatar';
 
 const ambiguousAliases: Record<string, string[]> = {
   OSU: ['OHIO STATE', 'OKLAHOMA STATE', 'OREGON STATE'],
@@ -86,7 +87,7 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
           <div className="admin-player-grid">
             {snapshot.players.map((player) => (
               <div className={player.active ? '' : 'inactive-player'} key={player.slug}>
-                <span className="avatar">{player.avatar}</span><b>{player.name}</b>
+                <PlayerAvatar name={player.name} /><b>{player.name}</b>
                 <form action={setPlayerActiveAction}>
                   <input type="hidden" name="slug" value={player.slug} />
                   <input type="hidden" name="active" value={String(!player.active)} />
