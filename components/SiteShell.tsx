@@ -61,8 +61,8 @@ export function SiteShell({
 
       <ScoreTicker />
 
-      <main>{children}</main>
       {active === 'hall' && <HallTheme />}
+      <main>{children}</main>
 
       <nav className="bottom-nav">
         <Link className={active === 'picks' ? 'active' : ''} href="/">PICKS</Link>
