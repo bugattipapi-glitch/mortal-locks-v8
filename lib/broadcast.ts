@@ -8,6 +8,20 @@ export type BroadcastRecap = {
 
 const decided = new Set(['W', 'L', 'P']);
 
+function preseasonRecap(snapshot: RuntimeSnapshot): BroadcastRecap {
+  return {
+    id: `season-${snapshot.season.number}-preseason`,
+    eyebrow: 'ML8-TV · PRESEASON SPECIAL',
+    lines: [
+      'WELCOME TO THIS WEEK IN MORTAL LOCKS.',
+      'LAST SEASON ENDED WITH AJ CROWNED LEAGUE CHAMPION.',
+      'IT WAS A STUNNING TURNAROUND FROM THE YEARS BEFORE.',
+      'THE TROPHY IS HIS. THE NEW BOARD IS CLEAN.',
+      "THIS YEAR, IT'S ANYONE'S LOCKS TO WIN.",
+    ],
+  };
+}
+
 function joinNames(names: string[]) {
   if (names.length < 2) return names[0] ?? '';
   if (names.length === 2) return `${names[0]} AND ${names[1]}`;
@@ -40,25 +54,15 @@ export function buildBroadcastRecap(snapshot: RuntimeSnapshot): BroadcastRecap {
   const currentWeek = snapshot.season.currentWeek;
   const preseason = snapshot.season.status.toUpperCase() === 'PRESEASON';
 
-  if (preseason) {
-    return {
-      id: `season-${snapshot.season.number}-preseason`,
-      eyebrow: 'ML8-TV · PRESEASON SPECIAL',
-      lines: [
-        'WELCOME TO THIS WEEK IN MORTAL LOCKS.',
-        'LAST SEASON ENDED WITH AJ CROWNED LEAGUE CHAMPION.',
-        'IT WAS A STUNNING TURNAROUND FROM THE YEARS BEFORE.',
-        'THE TROPHY IS HIS. THE NEW BOARD IS CLEAN.',
-        "THIS YEAR, IT'S ANYONE'S LOCKS TO WIN.",
-      ],
-    };
-  }
+  if (preseason) return preseasonRecap(snapshot);
 
-  const completedWeeks = Array.from({ length: Math.max(0, currentWeek - 1) }, (_, index) => currentWeek - index - 1);
+  const lastCompletedWeek = snapshot.season.status.toUpperCase() === 'FINAL' ? currentWeek : currentWeek - 1;
+  const completedWeeks = Array.from({ length: Math.max(0, lastCompletedWeek) }, (_, index) => lastCompletedWeek - index);
   const recapWeek = completedWeeks.find((week) => {
     const picks = snapshot.picks.filter((pick) => pick.week === week);
     return picks.length > 0 && picks.some((pick) => decided.has(pick.result));
-  }) ?? currentWeek;
+  });
+  if (!recapWeek) return preseasonRecap(snapshot);
   const picks = snapshot.picks.filter((pick) => pick.week === recapWeek);
   const record = weeklyRecord(picks);
   const playerResults = snapshot.players
