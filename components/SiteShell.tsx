@@ -2,9 +2,27 @@ import type { ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { season } from '../lib/data';
+import type { RuntimeSeason } from '../lib/runtime-data';
 import { ScoreTicker } from './ScoreTicker';
+import { StandingsNavLink } from './StandingsNavLink';
 
-export function SiteShell({ children, active = 'picks' }: { children: ReactNode; active?: 'picks' | 'standings' | 'season' | 'archives' | 'admin' }) {
+type ActiveSection = 'picks' | 'standings' | 'season' | 'hall' | 'admin';
+
+function displayDate(value: string) {
+  const [year, month, day] = value.split('-');
+  return month && day && year ? `${month}/${day}/${year.slice(-2)}` : '08/29/26';
+}
+
+export function SiteShell({
+  children,
+  active = 'picks',
+  seasonInfo = season,
+}: {
+  children: ReactNode;
+  active?: ActiveSection;
+  seasonInfo?: Pick<RuntimeSeason, 'currentWeek' | 'status' | 'startDate'>;
+}) {
+  const week = String(seasonInfo.currentWeek).padStart(2, '0');
   return (
     <div className="site-shell">
       <header className="broadcast-header">
@@ -17,8 +35,8 @@ export function SiteShell({ children, active = 'picks' }: { children: ReactNode;
         <div className="brand-wrap">
           <div className="brand-signal brand-signal-left" aria-hidden="true">
             <span>WEEK</span>
-            <b>01</b>
-            <small>PRESEASON</small>
+            <b>{week}</b>
+            <small>{seasonInfo.status}</small>
           </div>
           <div className="brand-logo">
             <Image src="/assets/mortal-locks-logo.png" alt="Mortal Locks 8 The Ocho" fill priority sizes="(max-width: 700px) 72vw, (max-width: 1000px) 54vw, 520px" />
@@ -36,7 +54,7 @@ export function SiteShell({ children, active = 'picks' }: { children: ReactNode;
         <div className="station-card">
           <div className="station-kicker">PUBLIC ACCESS SPORTS</div>
           <strong className="station-slogan">In Locks We Trust</strong>
-          <div className="station-date" aria-label="Season starts August 29, 2026">SEASON START · 08/29/26</div>
+          <div className="station-date" aria-label={`Season starts ${seasonInfo.startDate}`}>SEASON START · {displayDate(seasonInfo.startDate)}</div>
         </div>
       </header>
 
@@ -46,12 +64,12 @@ export function SiteShell({ children, active = 'picks' }: { children: ReactNode;
 
       <nav className="bottom-nav">
         <Link className={active === 'picks' ? 'active' : ''} href="/">PICKS</Link>
-        <a href="/#standings" className={active === 'standings' ? 'active' : ''}>STANDINGS</a>
+        <StandingsNavLink active={active === 'standings'} />
         <Link className={active === 'season' ? 'active' : ''} href="/season">SEASON</Link>
-        <Link className={active === 'archives' ? 'active' : ''} href="/archives">ARCHIVES</Link>
+        <Link className={active === 'hall' ? 'active' : ''} href="/hall-of-fame">HALL OF FAME</Link>
       </nav>
       <div className="footer-signoff">
-        <span>CHANNEL 8 · PUBLIC ACCESS SPORTS · {season.status}</span>
+        <span>CHANNEL 8 · PUBLIC ACCESS SPORTS · {seasonInfo.status}</span>
         <Link href="/admin">COMMISSIONER LOGIN</Link>
       </div>
     </div>

@@ -46,8 +46,8 @@ export function ScoreTicker() {
           </div>
         ))}
         <div className="score-chip muted-chip">
-          <div className="score-state">LOCAL BUILD</div>
-          <div>The ticker already polls every 60s. The API route is demo data until we add the sports feed.</div>
+          <div className="score-state">MANUAL RESULT MODE</div>
+          <div>The commissioner can grade every pick now. Live sports-data automation is the next broadcast upgrade.</div>
         </div>
       </div>
     </section>
