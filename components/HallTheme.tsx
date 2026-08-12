@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const HALL_TRACK = '/assets/audio/hall-fanfare.mp3';
+const HALL_TRACK = '/assets/audio/hall-fanfare.m4a';
 
 export function HallTheme() {
   const [playing, setPlaying] = useState(false);

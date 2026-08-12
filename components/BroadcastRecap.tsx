@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BroadcastRecap as BroadcastRecapData } from '../lib/broadcast';
 
-const BOOTH_TRACK = '/assets/audio/booth-sports-loop.mp3';
+const BOOTH_TRACK = '/assets/audio/booth-sports-loop.m4a';
 const BLIPS = ['/assets/audio/dialogue-blip-a.ogg', '/assets/audio/dialogue-blip-b.ogg'] as const;
 const ADVANCE_SOUND = '/assets/audio/dialogue-advance.ogg';
 
