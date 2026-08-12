@@ -104,7 +104,7 @@ function dateWindow(now = new Date()) {
 
 async function fetchLeague(league: 'nfl' | 'college-football', dates: string) {
   const response = await fetch(`${SCOREBOARD}/${league}/scoreboard?dates=${dates}&limit=100`, {
-    headers: { accept: 'application/json', 'user-agent': 'Mortal-Locks-Scoreboard/1.0' },
+    headers: { accept: 'application/json' },
     next: { revalidate: 30 },
   });
   if (!response.ok) throw new Error(`Score provider returned ${response.status} for ${league}.`);
