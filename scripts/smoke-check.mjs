@@ -10,6 +10,7 @@ const required = [
   'app/season/page.tsx',
   'app/archives/page.tsx',
   'app/hall-of-fame/page.tsx',
+  'app/hall-of-fame/all-time/page.tsx',
   'app/hall-of-fame/trophy-room/page.tsx',
   'app/hall-of-fame/tape-vault/page.tsx',
   'app/api/scores/route.ts',

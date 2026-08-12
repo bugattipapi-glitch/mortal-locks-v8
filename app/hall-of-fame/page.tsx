@@ -1,34 +1,40 @@
 import { HallNav } from '../../components/HallNav';
 import { SiteShell } from '../../components/SiteShell';
-import { allTimeStandings, displayPct, mostPickedTeams } from '../../lib/hall-of-fame';
+import { accolades, archivedPickCount, provisionalChampions, teamAccolades } from '../../lib/hall-of-fame';
 
 export default function HallOfFamePage() {
   return (
     <SiteShell active="hall">
       <section className="panel hall-panel">
-        <div className="panel-title gold-title"><span>HALL OF FAME</span><small>CAREER MODE · SEASONS IV–VII</small></div>
-        <HallNav active="records" />
-        <div className="hall-hero">
-          <div className="pixel-trophy" aria-hidden="true"><span>★</span></div>
-          <div><small>SELECT PLAYER // VIEW LEGACY</small><h1>ALL-TIME LEADERBOARD</h1><p>Pushes are neutral. Rankings use wins ÷ (wins + losses), then total wins as the tiebreaker.</p></div>
-        </div>
-        <div className="alltime-board hall-board">
-          <div className="alltime-row alltime-head"><span>RK</span><span></span><b>PLAYER</b><span>RECORD</span><span>WIN %</span><small>SEASONS</small></div>
-          {allTimeStandings.map((record, index) => (
-            <div className={`alltime-row ${index < 3 ? `podium podium-${index + 1}` : ''}`} key={record.name}>
-              <span>{index + 1}</span><span className="avatar tiny">{record.name.slice(0, 2).toUpperCase()}</span><b>{record.name}</b>
-              <span>{record.wins}-{record.losses}-{record.pushes}</span><span>{displayPct(record.pct)}</span><small>ML {record.seasons.join(', ')}</small>
-            </div>
-          ))}
-        </div>
-        <section className="team-frequency">
-          <div className="subsection-heading"><span>MOST PICKED TEAM</span><small>THE CREST THEY KEPT COMING BACK TO</small></div>
-          <div className="team-frequency-grid">
-            {mostPickedTeams.map((row) => (
-              <article key={row.name}><span className="pixel-shield">8</span><div><b>{row.name}</b><strong>{row.teams.join(' + ')}</strong><small>{row.count} PICKS</small></div></article>
+        <div className="panel-title gold-title"><span>THE TROPHY ROOM</span><small>UNLOCKED ACHIEVEMENTS</small></div>
+        <HallNav active="trophies" />
+        <div className="trophy-scene" aria-label="Pixel art trophy room">
+          <div className="trophy-case">
+            {provisionalChampions.map((champion) => (
+              <article className="champion-cup" key={champion.season}>
+                <div className="cup" aria-hidden="true"><i /><b>★</b><i /></div>
+                <div className="champion-plaque"><small>MORTAL LOCKS {champion.season}</small><strong>{champion.champion}</strong><span>{champion.title}</span></div>
+              </article>
             ))}
           </div>
-        </section>
+          <p className="provisional-record"><b>COMMISSIONER&apos;S NOTE:</b> The seven champion names are temporary placeholders until the official title history is recovered.</p>
+        </div>
+        <div className="subsection-heading"><span>LEGACY ACHIEVEMENTS</span><small>DERIVED FROM {archivedPickCount.toLocaleString()} ARCHIVED PICKS</small></div>
+        <div className="accolade-grid">
+          {accolades.map((award) => (
+            <article className={`accolade-card accolade-${award.tone}`} key={award.title}>
+              <span className="achievement-icon" aria-hidden="true">★</span><small>ACHIEVEMENT UNLOCKED</small><h2>{award.title}</h2><strong>{award.player}</strong><b>{award.stat}</b><p>{award.detail}</p>
+            </article>
+          ))}
+        </div>
+        <div className="subsection-heading"><span>TEAM TROPHIES</span><small>EIGHT-PICK QUALIFYING MINIMUM</small></div>
+        <div className="accolade-grid team-accolade-grid">
+          {teamAccolades.map((award) => (
+            <article className={`accolade-card accolade-${award.tone}`} key={award.title}>
+              <span className="achievement-icon team-achievement-icon" aria-hidden="true">8</span><small>FRANCHISE FILE</small><h2>{award.title}</h2><strong>{award.player}</strong><b>{award.stat}</b><p>{award.detail}</p>
+            </article>
+          ))}
+        </div>
       </section>
     </SiteShell>
   );

@@ -51,6 +51,42 @@ export const mostPickedTeams = allTimeStandings.map(({ name }) => {
   return { name, teams, count: max };
 });
 
+type TeamRecord = {
+  team: string;
+  wins: number;
+  losses: number;
+  pushes: number;
+  picks: number;
+  pct: number;
+};
+
+const teamRecords = (() => {
+  const records = new Map<string, Omit<TeamRecord, 'team' | 'pct'>>();
+  for (const pick of allPicks) {
+    const team = normalizedTeam(pick.bet);
+    if (!team) continue;
+    const record = records.get(team) ?? { wins: 0, losses: 0, pushes: 0, picks: 0 };
+    record.picks += 1;
+    if (pick.result === 'W') record.wins += 1;
+    if (pick.result === 'L') record.losses += 1;
+    if (pick.result === 'P') record.pushes += 1;
+    records.set(team, record);
+  }
+  return [...records.entries()].map(([team, record]) => ({
+    team,
+    ...record,
+    pct: pushNeutralPct(record.wins, record.losses),
+  }));
+})();
+
+// Eight picks keeps the team awards meaningful without rewarding a one-off flier.
+const qualifiedTeamRecords = teamRecords.filter((record) => record.picks >= 8);
+const bestTeam = [...qualifiedTeamRecords].sort((a, b) => b.pct - a.pct || b.picks - a.picks)[0];
+const worstTeam = [...qualifiedTeamRecords].sort((a, b) => a.pct - b.pct || b.picks - a.picks)[0];
+const zombieTeam = [...qualifiedTeamRecords]
+  .filter((record) => record.pct < 0.5)
+  .sort((a, b) => b.picks - a.picks || a.pct - b.pct)[0];
+
 function longestRun(player: string, result: 'W' | 'L') {
   let current = 0;
   let longest = 0;
@@ -113,6 +149,7 @@ const ceciFavoriteLosses = ceciFavoriteRecord.filter((pick) => pick.result === '
 const ceciFavoritePushes = ceciFavoriteRecord.filter((pick) => pick.result === 'P').length;
 const joe = lifetimeRecords.Joe;
 const brad = lifetimeRecords.Brad;
+const ironLock = [...allTimeStandings].sort((a, b) => b.wins - a.wins)[0];
 
 export type Accolade = {
   title: string;
@@ -192,6 +229,37 @@ export const accolades: Accolade[] = [
     stat: `${brad.wins}-${brad.losses}-${brad.pushes}`,
     detail: 'One win above the break-even line after 144 recorded picks. Every pixel counts.',
     tone: 'gold',
+  },
+  {
+    title: 'IRON LOCK',
+    player: ironLock.name,
+    stat: `${ironLock.wins} ALL-TIME WINS`,
+    detail: `No one has cashed more recorded Mortal Locks picks across Seasons ${ironLock.seasons.join(', ')}.`,
+    tone: 'gold',
+  },
+];
+
+export const teamAccolades: Accolade[] = [
+  {
+    title: 'GOLDEN FRANCHISE',
+    player: bestTeam.team,
+    stat: `${bestTeam.wins}-${bestTeam.losses}-${bestTeam.pushes} · ${displayPct(bestTeam.pct)}`,
+    detail: `Best record among teams picked at least eight times (${bestTeam.picks} total picks).`,
+    tone: 'gold',
+  },
+  {
+    title: 'TEAM OF DOOM',
+    player: worstTeam.team,
+    stat: `${worstTeam.wins}-${worstTeam.losses}-${worstTeam.pushes} · ${displayPct(worstTeam.pct)}`,
+    detail: `Worst record among teams picked at least eight times (${worstTeam.picks} total picks).`,
+    tone: 'red',
+  },
+  {
+    title: 'ZOMBIE TEAM',
+    player: zombieTeam.team,
+    stat: `${zombieTeam.picks} PICKS · ${zombieTeam.wins}-${zombieTeam.losses}-${zombieTeam.pushes}`,
+    detail: 'The most-picked team with a losing record. It keeps coming back, and so do the bettors.',
+    tone: 'purple',
   },
 ];
 
