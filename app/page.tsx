@@ -1,7 +1,11 @@
 import Link from 'next/link';
 import { SiteShell } from '../components/SiteShell';
 import { StatusPill } from '../components/StatusPill';
-import { demoPicks, demoStandings } from '../lib/data';
+import { commentaryRules, demoPicks, demoStandings } from '../lib/data';
+
+const featuredCalls = commentaryRules.filter(({ label }) =>
+  ['SOME SPREAD', 'PUSH JOB', 'THE MIDDLE IS ALIVE'].includes(label)
+);
 
 export default function HomePage() {
   return (
@@ -11,7 +15,7 @@ export default function HomePage() {
           <div className="panel-title red-title"><span>THIS WEEK'S PICKS</span><small>WEEK 1 · PREVIEW DATA</small></div>
           <div className="picks-table desktop-table">
             <div className="pick-row pick-head">
-              <div>PLAYER</div><div>PICK 1</div><div>PICK 2</div><div>RESULTS</div><div>COMMENTARY</div>
+              <div>PLAYER</div><div>PICK 1</div><div>PICK 2</div><div>RESULTS</div><div>BOOTH CALL</div>
             </div>
             {demoPicks.map((row) => (
               <div className="pick-row" key={row.player}>
@@ -77,10 +81,16 @@ export default function HomePage() {
             </div>
           </section>
 
-          <section className="panel commentary-panel">
-            <div className="panel-title cyan-title">COMMENTARY BOX</div>
-            <div className="commentary-stack">
-              <span>SOME SPREAD</span><span>BACKDOOR COVER</span><span>BAD BEAT</span><span>UNDER TAKER</span>
+          <section className="panel booth-panel">
+            <div className="panel-title cyan-title">FROM THE BOOTH</div>
+            <p className="booth-explainer">Commissioner-assigned postgame callouts. When a pick earns one, it appears in that player&apos;s <b>Booth Call</b> column.</p>
+            <div className="booth-calls">
+              {featuredCalls.map((call) => (
+                <div className="booth-call" key={call.label}>
+                  <span>{call.label}</span>
+                  <small>{call.detail}</small>
+                </div>
+              ))}
             </div>
           </section>
         </aside>
