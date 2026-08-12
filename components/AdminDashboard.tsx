@@ -6,11 +6,13 @@ import {
   logoutAction,
   overrideResultAction,
   savePickAction,
+  saveParsedPicksAction,
   saveSeasonAction,
   setPlayerActiveAction,
 } from '../app/admin/actions';
 import { commentaryRules } from '../lib/data';
 import type { RuntimeSnapshot } from '../lib/runtime-data';
+import { parseTextPicks } from '../lib/pick-text-parser';
 
 const ambiguousAliases: Record<string, string[]> = {
   OSU: ['OHIO STATE', 'OKLAHOMA STATE', 'OREGON STATE'],
@@ -24,6 +26,7 @@ const noticeCopy: Record<string, string> = {
   'roster-updated': 'ROSTER STATUS UPDATED',
   'pick-saved': 'WEEKLY PICK SAVED',
   'result-saved': 'MANUAL RESULT LOCKED',
+  'text-picks-saved': 'TEXT PICKS IMPORTED',
 };
 
 function parsePreview(raw: string) {
@@ -35,7 +38,7 @@ function parsePreview(raw: string) {
 }
 
 export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot; notice?: string }) {
-  const activePlayers = snapshot.players.filter((player) => player.active);
+  const activePlayers = useMemo(() => snapshot.players.filter((player) => player.active), [snapshot.players]);
   const [rawPick, setRawPick] = useState('');
   const [game, setGame] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState(activePlayers[0]?.slug ?? '');
@@ -44,9 +47,16 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
   const [period, setPeriod] = useState('FULL');
   const [week, setWeek] = useState(String(snapshot.season.currentWeek));
   const [isForce, setIsForce] = useState(false);
+  const [textPicks, setTextPicks] = useState('');
+  const [textSport, setTextSport] = useState<'CFB' | 'NFL'>('CFB');
   const preview = useMemo(() => parsePreview(`${game} ${rawPick}`), [game, rawPick]);
   const selectedName = snapshot.players.find((player) => player.slug === selectedPlayer)?.name ?? 'PLAYER';
   const visiblePicks = snapshot.picks.filter((pick) => pick.week === Number(week));
+  const parsedTextPicks = useMemo(
+    () => parseTextPicks(textPicks, activePlayers, textSport),
+    [activePlayers, textPicks, textSport],
+  );
+  const readyTextPicks = parsedTextPicks.filter((pick) => pick.ready);
 
   return (
     <div className="admin-grid">
@@ -104,7 +114,32 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
 
       <section className="panel admin-panel">
         <div className="panel-title red-title"><span>ENTER WEEKLY PICKS</span><small>2 PICKS · 1 PLAYER</small></div>
+        <div className="admin-section text-pick-intake">
+          <h2>PASTE TEXT PICKS</h2>
+          <p className="helper">Paste one pick per line. Best format: <b>AJ 1 CFB · Ohio State vs Michigan | Ohio State -6.5 · CALL: SOME SPREAD</b>. Every line is previewed before anything is saved.</p>
+          <div className="admin-form-grid">
+            <label>Week<select value={week} onChange={(event) => setWeek(event.target.value)}>{Array.from({ length: 18 }, (_, index) => index + 1).map((number) => <option key={number} value={number}>Week {number}</option>)}</select></label>
+            <label>Default sport<select value={textSport} onChange={(event) => setTextSport(event.target.value as 'CFB' | 'NFL')}><option>CFB</option><option>NFL</option></select></label>
+          </div>
+          <label>Group text / picks<textarea value={textPicks} onChange={(event) => setTextPicks(event.target.value)} placeholder={'AJ 1 CFB · Ohio State vs Michigan | Ohio State -6.5\nAJ 2 CFB · Texas vs Oklahoma | Texas -3\nKev 1 NFL · Bills vs Jets | Bills -4 · CALL: PUSH JOB'} /></label>
+          {!!parsedTextPicks.length && <div className="text-parse-list">
+            {parsedTextPicks.map((pick) => <article className={pick.ready ? 'ready' : 'warning'} key={pick.id}>
+              <span>{pick.ready ? 'READY' : 'CHECK'}</span>
+              <b>{pick.playerName ?? 'UNKNOWN'} · P{pick.slot ?? '?'} · {pick.sport ?? textSport}{pick.period !== 'FULL' ? ` · ${pick.period}` : ''}</b>
+              <strong>{pick.game ?? 'GAME NOT PARSED'} → {pick.bet ?? 'PICK NOT PARSED'}</strong>
+              {!!pick.warnings.length && <small>{pick.warnings.join(' · ')}</small>}
+            </article>)}
+          </div>}
+          <form action={saveParsedPicksAction}>
+            <input type="hidden" name="seasonNumber" value={snapshot.season.number} />
+            <input type="hidden" name="week" value={week} />
+            <input type="hidden" name="payload" value={JSON.stringify(readyTextPicks.map(({ playerSlug, slot: parsedSlot, sport: parsedSport, period: parsedPeriod, game: parsedGame, bet: parsedBet, commentary }) => ({ playerSlug, slot: parsedSlot, sport: parsedSport, period: parsedPeriod, game: parsedGame, bet: parsedBet, commentary })))} />
+            <button className="primary-button" type="submit" disabled={!readyTextPicks.length || readyTextPicks.length !== parsedTextPicks.length}>IMPORT {readyTextPicks.length} CONFIRMED PICK{readyTextPicks.length === 1 ? '' : 'S'}</button>
+          </form>
+          <p className="helper">If any line says CHECK, edit the pasted text or use the structured entry form below. Nothing partial is imported.</p>
+        </div>
         <form className="admin-section" action={savePickAction}>
+          <h2>STRUCTURED ENTRY · FALLBACK</h2>
           <input type="hidden" name="seasonNumber" value={snapshot.season.number} />
           <div className="admin-form-grid">
             <label>Week<select name="week" value={week} onChange={(event) => setWeek(event.target.value)}>{Array.from({ length: 18 }, (_, index) => index + 1).map((number) => <option key={number} value={number}>Week {number}</option>)}</select></label>

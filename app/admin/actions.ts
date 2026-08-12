@@ -9,6 +9,7 @@ import {
   setRuntimePlayerActive,
   updateSeason,
   upsertRuntimePick,
+  upsertRuntimePicks,
 } from '../../lib/runtime-data';
 import type { Period, Result, Sport } from '../../lib/data';
 
@@ -100,6 +101,56 @@ export async function savePickAction(formData: FormData) {
   });
   refreshPublicPages();
   redirect('/admin?notice=pick-saved');
+}
+
+export async function saveParsedPicksAction(formData: FormData) {
+  await requireCommissioner();
+  const payload = value(formData, 'payload');
+  const seasonNumber = integer(formData, 'seasonNumber', 1, 99);
+  const week = integer(formData, 'week', 1, 18);
+  let picks: Array<{
+    playerSlug: string;
+    slot: 1 | 2;
+    sport: Sport;
+    period: Period;
+    game: string;
+    bet: string;
+    commentary?: string;
+  }>;
+  try {
+    picks = JSON.parse(payload) as typeof picks;
+  } catch {
+    throw new Error('The text-pick batch could not be read.');
+  }
+  if (!Array.isArray(picks) || !picks.length || picks.length > 36) throw new Error('The text-pick batch is empty or too large.');
+  const seen = new Set<string>();
+  const validated = [];
+  for (const pick of picks) {
+    const key = `${pick.playerSlug}:${pick.slot}`;
+    if (seen.has(key)) throw new Error(`Duplicate player/slot in the batch: ${key}.`);
+    seen.add(key);
+    if (!/^[a-z0-9-]+$/.test(pick.playerSlug)) throw new Error('Invalid player in parsed picks.');
+    if (![1, 2].includes(pick.slot) || !['CFB', 'NFL'].includes(pick.sport) || !['FULL', '1H', '1Q'].includes(pick.period)) throw new Error('Invalid parsed pick fields.');
+    const game = String(pick.game ?? '').trim().replace(/\s+/g, ' ');
+    const bet = String(pick.bet ?? '').trim().replace(/\s+/g, ' ');
+    if (game.length < 3 || game.length > 120 || bet.length < 2 || bet.length > 120) throw new Error('Each parsed row needs a valid game and pick.');
+    if (/\b(OSU|USC|MSU)\b/i.test(`${game} ${bet}`)) throw new Error('Spell out ambiguous team abbreviations before saving.');
+    validated.push({
+      seasonNumber,
+      week,
+      playerSlug: pick.playerSlug,
+      slot: pick.slot,
+      sport: pick.sport,
+      period: pick.period,
+      game,
+      bet,
+      force: false,
+      commentary: String(pick.commentary ?? '').slice(0, 80).toUpperCase(),
+    });
+  }
+  await upsertRuntimePicks(validated);
+  refreshPublicPages();
+  redirect('/admin?notice=text-picks-saved');
 }
 
 export async function overrideResultAction(formData: FormData) {

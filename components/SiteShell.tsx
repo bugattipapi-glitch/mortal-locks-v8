@@ -5,6 +5,10 @@ import { season } from '../lib/data';
 import type { RuntimeSeason } from '../lib/runtime-data';
 import { ScoreTicker } from './ScoreTicker';
 import { StandingsNavLink } from './StandingsNavLink';
+import { BroadcastLauncher } from './BroadcastLauncher';
+import { BroadcastRecap } from './BroadcastRecap';
+import type { BroadcastRecap as BroadcastRecapData } from '../lib/broadcast';
+import { HallTheme } from './HallTheme';
 
 type ActiveSection = 'picks' | 'standings' | 'season' | 'hall' | 'admin';
 
@@ -17,21 +21,18 @@ export function SiteShell({
   children,
   active = 'picks',
   seasonInfo = season,
+  recap,
 }: {
   children: ReactNode;
   active?: ActiveSection;
   seasonInfo?: Pick<RuntimeSeason, 'currentWeek' | 'status' | 'startDate'>;
+  recap?: BroadcastRecapData;
 }) {
   const week = String(seasonInfo.currentWeek).padStart(2, '0');
   return (
     <div className="site-shell">
       <header className="broadcast-header">
-        <div className="tv-window">
-          <div className="on-air"><span /> ON AIR</div>
-          <div className="tv-copy">ML8-TV<br/><b>CHANNEL 8</b></div>
-          <div className="signal-bug" aria-hidden="true">UHF · 08</div>
-          <div className="scanlines" />
-        </div>
+        {recap ? <BroadcastLauncher /> : <div className="tv-window"><div className="on-air"><span /> ON AIR</div><div className="tv-copy">ML8-TV<br/><b>CHANNEL 8</b></div><div className="signal-bug" aria-hidden="true">UHF · 08</div><div className="scanlines" /></div>}
         <div className="brand-wrap">
           <div className="brand-signal brand-signal-left" aria-hidden="true">
             <span>WEEK</span>
@@ -61,6 +62,7 @@ export function SiteShell({
       <ScoreTicker />
 
       <main>{children}</main>
+      {active === 'hall' && <HallTheme />}
 
       <nav className="bottom-nav">
         <Link className={active === 'picks' ? 'active' : ''} href="/">PICKS</Link>
@@ -72,6 +74,7 @@ export function SiteShell({
         <span>CHANNEL 8 · PUBLIC ACCESS SPORTS · {seasonInfo.status}</span>
         <Link href="/admin">COMMISSIONER LOGIN</Link>
       </div>
+      {recap && <BroadcastRecap recap={recap} />}
     </div>
   );
 }

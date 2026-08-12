@@ -385,6 +385,42 @@ export async function upsertRuntimePick(input: Omit<RuntimePick, 'playerName' | 
   `;
 }
 
+export async function upsertRuntimePicks(inputs: Array<Omit<RuntimePick, 'playerName' | 'result' | 'manualOverride' | 'updatedAt'>>) {
+  const sql = await ensureDatabase();
+  const rows = JSON.stringify(inputs.map((input) => ({
+    season_number: input.seasonNumber,
+    week: input.week,
+    player_slug: input.playerSlug,
+    slot: input.slot,
+    sport: input.sport,
+    game: input.game,
+    bet: input.bet,
+    period: input.period,
+    force: input.force,
+    commentary: input.commentary,
+  })));
+  await sql`
+    INSERT INTO ml_picks (
+      season_number, week, player_slug, slot, sport, game, bet, result,
+      period, force, manual_override, commentary
+    )
+    SELECT season_number, week, player_slug, slot, sport, game, bet, 'PENDING', period, force, false, commentary
+    FROM jsonb_to_recordset(${rows}::jsonb)
+      AS incoming(
+        season_number integer, week integer, player_slug text, slot integer,
+        sport text, game text, bet text, period text, force boolean, commentary text
+      )
+    ON CONFLICT (season_number, week, player_slug, slot) DO UPDATE SET
+      sport = EXCLUDED.sport,
+      game = EXCLUDED.game,
+      bet = EXCLUDED.bet,
+      period = EXCLUDED.period,
+      force = EXCLUDED.force,
+      commentary = EXCLUDED.commentary,
+      updated_at = now()
+  `;
+}
+
 export async function overrideRuntimeResult(input: {
   seasonNumber: number;
   week: number;

@@ -3,6 +3,7 @@ import { SiteShell } from '../components/SiteShell';
 import { StatusPill } from '../components/StatusPill';
 import { commentaryRules } from '../lib/data';
 import { getRuntimeSnapshot, type RuntimePick } from '../lib/runtime-data';
+import { buildBroadcastRecap, calculatePlayerStreaks } from '../lib/broadcast';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,8 @@ function pickCell(pick: RuntimePick | undefined, key: string) {
 export default async function HomePage() {
   const snapshot = await getRuntimeSnapshot();
   const activePlayers = snapshot.players.filter((player) => player.active);
+  const recap = buildBroadcastRecap(snapshot);
+  const streaks = calculatePlayerStreaks(snapshot);
   const weekRows = activePlayers.map((player) => ({
     player,
     picks: snapshot.picks
@@ -31,7 +34,7 @@ export default async function HomePage() {
   }));
 
   return (
-    <SiteShell seasonInfo={snapshot.season}>
+    <SiteShell seasonInfo={snapshot.season} recap={recap}>
       <div className="dashboard-grid">
         <section className="panel picks-panel">
           <div className="panel-title red-title">
@@ -90,15 +93,18 @@ export default async function HomePage() {
             <div className="standings-lock-bug" aria-hidden="true">STANDINGS FEED LOCKED</div>
             <div className="panel-title cyan-title">STANDINGS</div>
             <div className="standings-list">
-              {snapshot.standings.map((player, index) => (
-                <div className="standing-row" key={player.name}>
+              {snapshot.standings.map((player, index) => {
+                const streak = streaks.get(player.name);
+                return (
+                <div className={`standing-row ${streak ? `streak-${streak.direction}` : ''}`} key={player.name}>
                   <span className="rank">{index + 1}</span>
                   <span className="avatar tiny">{player.name.slice(0, 2).toUpperCase()}</span>
                   <b>{player.name}</b>
+                  {streak && <em className="streak-badge">{streak.direction === 'hot' ? 'HOT' : 'COLD'} ×{streak.length}</em>}
                   <span>{player.wins}-{player.losses}{player.pushes ? `-${player.pushes}` : ''}</span>
                   <span className="pct">{player.pct.toFixed(3).replace(/^0/, '')}</span>
                 </div>
-              ))}
+              )})}
             </div>
           </section>
 
