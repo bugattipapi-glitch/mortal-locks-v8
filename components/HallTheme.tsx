@@ -33,11 +33,21 @@ export function HallTheme() {
     soundtrack.loop = true;
     soundtrack.preload = 'auto';
     audio.current = soundtrack;
+    const primed = window.sessionStorage.getItem('ml8-hall-audio-primed') === '1';
+    window.sessionStorage.removeItem('ml8-hall-audio-primed');
+    window.dispatchEvent(new Event('ml8:hall-audio-mounted'));
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     soundtrack.addEventListener('play', onPlay);
     soundtrack.addEventListener('pause', onPause);
-    play();
+    if (primed) {
+      soundtrack.volume = 0.3;
+      void soundtrack.play()
+        .then(() => { setPlaying(true); setBlocked(false); })
+        .catch(() => { setPlaying(false); setBlocked(true); });
+    } else {
+      play();
+    }
     return () => {
       soundtrack.pause();
       soundtrack.removeEventListener('play', onPlay);

@@ -10,6 +10,7 @@ import { StandingsNavLink } from './StandingsNavLink';
 import { BroadcastLauncher } from './BroadcastLauncher';
 import { BroadcastRecap } from './BroadcastRecap';
 import { HallTheme } from './HallTheme';
+import { HallNavLink } from './HallNavLink';
 
 type ActiveSection = 'picks' | 'standings' | 'season' | 'hall' | 'admin';
 
@@ -78,7 +79,7 @@ export async function SiteShell({
         <Link className={active === 'picks' ? 'active' : ''} href="/">PICKS</Link>
         <StandingsNavLink active={active === 'standings'} />
         <Link className={active === 'season' ? 'active' : ''} href="/season">SEASON</Link>
-        <Link className={active === 'hall' ? 'active' : ''} href="/hall-of-fame">HALL OF FAME</Link>
+        <HallNavLink active={active === 'hall'} />
       </nav>
       <div className="footer-signoff">
         <span>CHANNEL 8 · PUBLIC ACCESS SPORTS · {resolvedSeason.status}</span>
