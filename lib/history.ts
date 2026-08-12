@@ -1,5 +1,5 @@
-// Generated from the Mortal Locks IV-VII spreadsheets.
-// Raw historical picks are bundled locally so the archive UI can be tested before database import.
+// Seasons I-III contain official final records; their weekly tapes are unavailable.
+// Seasons IV-VII were generated from the source spreadsheets with raw picks bundled locally.
 
 export type HistoricalResult = 'W' | 'L' | 'P';
 
@@ -25,9 +25,131 @@ export type HistoricalSeason = {
   roster: string[];
   records: Record<string, HistoricalRecord>;
   picks: HistoricalPick[];
+  tapeDamaged?: boolean;
 };
 
 export const historicalSeasons: Record<number, HistoricalSeason> = {
+  "1": {
+    "number": 1,
+    "title": "Vault Tape Damaged",
+    "roster": [
+      "Joe",
+      "Jay",
+      "Kev"
+    ],
+    "records": {
+      "Joe": {
+        "wins": 11,
+        "losses": 14,
+        "pushes": 3,
+        "sheetPct": 0.3929
+      },
+      "Jay": {
+        "wins": 18,
+        "losses": 12,
+        "pushes": 0,
+        "sheetPct": 0.6
+      },
+      "Kev": {
+        "wins": 16,
+        "losses": 12,
+        "pushes": 1,
+        "sheetPct": 0.5517
+      }
+    },
+    "picks": [],
+    "tapeDamaged": true
+  },
+  "2": {
+    "number": 2,
+    "title": "Vault Tape Damaged",
+    "roster": [
+      "Joe",
+      "Brad",
+      "Jay",
+      "Kev"
+    ],
+    "records": {
+      "Joe": {
+        "wins": 22,
+        "losses": 11,
+        "pushes": 0,
+        "sheetPct": 0.6667
+      },
+      "Brad": {
+        "wins": 18,
+        "losses": 14,
+        "pushes": 1,
+        "sheetPct": 0.5455
+      },
+      "Jay": {
+        "wins": 13,
+        "losses": 20,
+        "pushes": 0,
+        "sheetPct": 0.3939
+      },
+      "Kev": {
+        "wins": 12,
+        "losses": 21,
+        "pushes": 0,
+        "sheetPct": 0.3636
+      }
+    },
+    "picks": [],
+    "tapeDamaged": true
+  },
+  "3": {
+    "number": 3,
+    "title": "Miami Nights",
+    "roster": [
+      "Jay",
+      "Blaine",
+      "Kev",
+      "Ceci",
+      "Joe",
+      "Brad"
+    ],
+    "records": {
+      "Jay": {
+        "wins": 22,
+        "losses": 11,
+        "pushes": 1,
+        "sheetPct": 0.6471
+      },
+      "Blaine": {
+        "wins": 19,
+        "losses": 13,
+        "pushes": 2,
+        "sheetPct": 0.5588
+      },
+      "Kev": {
+        "wins": 19,
+        "losses": 14,
+        "pushes": 1,
+        "sheetPct": 0.5588
+      },
+      "Ceci": {
+        "wins": 19,
+        "losses": 15,
+        "pushes": 0,
+        "sheetPct": 0.5588
+      },
+      "Joe": {
+        "wins": 16,
+        "losses": 17,
+        "pushes": 1,
+        "sheetPct": 0.4706
+      },
+      "Brad": {
+        "wins": 15,
+        "losses": 18,
+        "pushes": 1,
+        "sheetPct": 0.4412
+      }
+    },
+    "picks": [],
+    "tapeDamaged": true
+  },
   "4": {
     "number": 4,
     "title": "Burn The Boats",
@@ -9215,7 +9337,21 @@ export const historicalSeasons: Record<number, HistoricalSeason> = {
   }
 } as Record<number, HistoricalSeason>;
 
-export const lifetimeRecords: Record<string, HistoricalRecord & { seasons: number[] }> = {
+export const lifetimeRecords: Record<string, HistoricalRecord & { seasons: number[] }> = Object.values(historicalSeasons).reduce((careerRecords, season) => {
+  for (const [name, record] of Object.entries(season.records)) {
+    const career = careerRecords[name] ?? { wins: 0, losses: 0, pushes: 0, sheetPct: 0, seasons: [] };
+    career.wins += record.wins;
+    career.losses += record.losses;
+    career.pushes += record.pushes;
+    career.seasons.push(season.number);
+    career.sheetPct = career.wins / (career.wins + career.losses + career.pushes);
+    careerRecords[name] = career;
+  }
+  return careerRecords;
+}, {} as Record<string, HistoricalRecord & { seasons: number[] }>);
+
+/* Legacy generated totals retained below for source-tape auditing.
+const generatedLifetimeRecords: Record<string, HistoricalRecord & { seasons: number[] }> = {
   "AJ": {
     "wins": 52,
     "losses": 53,
@@ -9320,5 +9456,6 @@ export const lifetimeRecords: Record<string, HistoricalRecord & { seasons: numbe
     ]
   }
 } as Record<string, HistoricalRecord & { seasons: number[] }>;
+*/
 
-export const historicalSeasonNumbers = [7, 6, 5, 4] as const;
+export const historicalSeasonNumbers = [7, 6, 5, 4, 3, 2, 1] as const;

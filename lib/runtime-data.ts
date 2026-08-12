@@ -345,6 +345,24 @@ export async function updateSeason(input: RuntimeSeason) {
   `;
 }
 
+export async function resetRuntimeSeason(seasonNumber: number) {
+  const sql = await ensureDatabase();
+  const settingRows = await sql`SELECT value FROM ml_settings WHERE key = 'season_number'`;
+  const activeSeason = Number((settingRows as unknown as Array<{ value: string }>)[0]?.value ?? previewSeason.number);
+  if (seasonNumber !== activeSeason) throw new Error('Only the active season can be reset.');
+  await sql`DELETE FROM ml_picks WHERE season_number = ${seasonNumber}`;
+  const rows = JSON.stringify([
+    { key: 'current_week', value: '1' },
+    { key: 'status', value: 'PRESEASON' },
+  ]);
+  await sql`
+    INSERT INTO ml_settings (key, value)
+    SELECT key, value
+    FROM jsonb_to_recordset(${rows}::jsonb) AS incoming(key text, value text)
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+  `;
+}
+
 export async function addRuntimePlayer(name: string) {
   const sql = await ensureDatabase();
   const slug = playerSlug(name);

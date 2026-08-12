@@ -1,6 +1,6 @@
 import { HallNav } from '../../components/HallNav';
 import { SiteShell } from '../../components/SiteShell';
-import { accolades, archivedPickCount, provisionalChampions, teamAccolades } from '../../lib/hall-of-fame';
+import { accolades, archivedPickCount, champions, teamAccolades } from '../../lib/hall-of-fame';
 
 export default function HallOfFamePage() {
   return (
@@ -10,16 +10,16 @@ export default function HallOfFamePage() {
         <HallNav active="trophies" />
         <div className="trophy-scene" aria-label="Pixel art trophy room">
           <div className="trophy-case">
-            {provisionalChampions.map((champion) => (
+            {champions.map((champion) => (
               <article className="champion-cup" key={champion.season}>
                 <div className="cup" aria-hidden="true"><i /><b>★</b><i /></div>
                 <div className="champion-plaque"><small>MORTAL LOCKS {champion.season}</small><strong>{champion.champion}</strong><span>{champion.title}</span></div>
               </article>
             ))}
           </div>
-          <p className="provisional-record"><b>COMMISSIONER&apos;S NOTE:</b> The seven champion names are temporary placeholders until the official title history is recovered.</p>
+          <p className="champion-record"><b>OFFICIAL RECORD:</b> Seven seasons. Five champions. One three-time king.</p>
         </div>
-        <div className="subsection-heading"><span>LEGACY ACHIEVEMENTS</span><small>DERIVED FROM {archivedPickCount.toLocaleString()} ARCHIVED PICKS</small></div>
+        <div className="subsection-heading"><span>LEGACY ACHIEVEMENTS</span><small>{archivedPickCount.toLocaleString()} RESTORED PICKS + OFFICIAL SEASON RECORDS</small></div>
         <div className="accolade-grid">
           {accolades.map((award) => (
             <article className={`accolade-card accolade-${award.tone} ${award.title === 'IRON LOCK' ? 'iron-lock-card' : ''}`} key={award.title}>

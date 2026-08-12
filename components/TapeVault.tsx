@@ -34,7 +34,7 @@ export function TapeVault() {
             }}>ML {number}</button>
           ))}
         </div>
-        <div className="mode-tabs compact-tabs">
+        <div className={`mode-tabs compact-tabs ${season.tapeDamaged ? 'tape-controls-disabled' : ''}`}>
           <button className={view === 'week' ? 'selected' : ''} onClick={() => setView('week')}>BY WEEK</button>
           <button className={view === 'player' ? 'selected' : ''} onClick={() => setView('player')}>BY PLAYER</button>
         </div>
@@ -42,10 +42,30 @@ export function TapeVault() {
 
       <div className="archive-season-head">
         <div><small>MORTAL LOCKS {season.number}</small><h1>{season.title}</h1></div>
-        <div className="archive-roster-count">{season.roster.length} PLAYERS · {season.picks.length} PICKS</div>
+        <div className="archive-roster-count">{season.roster.length} PLAYERS · {season.tapeDamaged ? 'FINAL RECORDS ONLY' : `${season.picks.length} PICKS`}</div>
       </div>
 
-      {view === 'week' ? (
+      {season.tapeDamaged ? (
+        <section className="damaged-tape-panel">
+          <div className="damaged-tape-icon" aria-hidden="true">VHS</div>
+          <small>ARCHIVE STATUS</small>
+          <h2>VAULT TAPE DAMAGED</h2>
+          <p>The week-by-week footage did not survive. The official final records remain intact.</p>
+          <div className="damaged-record-grid">
+            {season.roster.map((name) => {
+              const record = season.records[name];
+              return (
+                <article key={name}>
+                  <PlayerAvatar name={name} />
+                  <b>{name}</b>
+                  <strong>{record.wins}-{record.losses}-{record.pushes}</strong>
+                  <span>{displayPct(pushNeutralPct(record.wins, record.losses))}</span>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : view === 'week' ? (
         <>
           <div className="week-strip">
             {Array.from({ length: 18 }, (_, index) => index + 1).map((number) => (

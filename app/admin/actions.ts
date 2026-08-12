@@ -6,6 +6,7 @@ import { closeCommissionerSession, openCommissionerSession, requireCommissioner 
 import {
   addRuntimePlayer,
   overrideRuntimeResult,
+  resetRuntimeSeason,
   setRuntimePlayerActive,
   updateSeason,
   upsertRuntimePick,
@@ -55,6 +56,13 @@ export async function saveSeasonAction(formData: FormData) {
   });
   refreshPublicPages();
   redirect('/admin?notice=season-saved');
+}
+
+export async function resetSeasonAction(formData: FormData) {
+  await requireCommissioner();
+  await resetRuntimeSeason(integer(formData, 'seasonNumber', 1, 99));
+  refreshPublicPages();
+  redirect('/admin?notice=season-reset');
 }
 
 export async function addPlayerAction(formData: FormData) {

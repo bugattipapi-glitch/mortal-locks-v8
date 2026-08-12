@@ -7,7 +7,7 @@ export default function AllTimeBoardPage() {
   return (
     <SiteShell active="hall">
       <section className="panel hall-panel">
-        <div className="panel-title gold-title"><span>HALL OF FAME</span><small>CAREER MODE · SEASONS IV–VII</small></div>
+        <div className="panel-title gold-title"><span>HALL OF FAME</span><small>CAREER MODE · SEASONS I–VII</small></div>
         <HallNav active="records" />
         <div className="hall-hero">
           <div className="pixel-trophy" aria-hidden="true"><span>★</span></div>
@@ -23,7 +23,7 @@ export default function AllTimeBoardPage() {
           ))}
         </div>
         <section className="team-frequency">
-          <div className="subsection-heading"><span>MOST PICKED TEAM</span><small>THE CREST THEY KEPT COMING BACK TO</small></div>
+          <div className="subsection-heading"><span>MOST PICKED TEAM</span><small>RESTORED PICK TAPE · SEASONS IV–VII</small></div>
           <div className="team-frequency-grid">
             {mostPickedTeams.map((row) => (
               <article key={row.name}><span className="pixel-shield">8</span><div><b>{row.name}</b><strong>{row.teams.join(' + ')}</strong><small>{row.count} PICKS</small></div></article>

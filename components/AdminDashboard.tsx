@@ -14,6 +14,7 @@ import { commentaryRules } from '../lib/data';
 import type { RuntimeSnapshot } from '../lib/runtime-data';
 import { parseTextPicks } from '../lib/pick-text-parser';
 import { PlayerAvatar } from './PlayerAvatar';
+import { SeasonResetControl } from './SeasonResetControl';
 
 const ambiguousAliases: Record<string, string[]> = {
   OSU: ['OHIO STATE', 'OKLAHOMA STATE', 'OREGON STATE'],
@@ -28,6 +29,7 @@ const noticeCopy: Record<string, string> = {
   'pick-saved': 'WEEKLY PICK SAVED',
   'result-saved': 'MANUAL RESULT LOCKED',
   'text-picks-saved': 'TEXT PICKS IMPORTED',
+  'season-reset': 'SEASON TEST DATA CLEARED · WEEK 1 PRESEASON RESTORED',
 };
 
 function parsePreview(raw: string) {
@@ -107,9 +109,15 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
           <h2>SCORE CONTROL STATUS</h2>
           <div className="system-status-grid">
             <div><span className="database-light online" /><b>MANUAL RESULTS</b><small>OPERATIONAL</small></div>
-            <div><span className="database-light" /><b>SPORTS FEED</b><small>DEMO TICKER</small></div>
+            <div><span className="database-light online" /><b>SPORTS FEED</b><small>LIVE PICK MATCHING</small></div>
           </div>
-          <p className="helper">Use Result Override to grade picks now. Automatic score grading is the one commissioner function intentionally left for the live sports-data phase.</p>
+          <p className="helper">The ticker looks up pending picks against the live NFL/college scoreboard every minute. Broadcast status does not control the feed. Results still require commissioner grading so spreads, totals, first halves, and pushes remain exact.</p>
+        </div>
+
+        <div className="admin-section danger-zone">
+          <h2>TEST SEASON RESET</h2>
+          <p className="helper">Use this after the preseason test. It clears only Season {snapshot.season.number} picks/results and returns the broadcast to Week 1 · PRESEASON.</p>
+          <SeasonResetControl seasonNumber={snapshot.season.number} pickCount={snapshot.picks.length} />
         </div>
       </section>
 

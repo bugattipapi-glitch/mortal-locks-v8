@@ -17,8 +17,9 @@ function playerKey(name: string) {
 }
 
 export function PlayerAvatar({ name, size = 'default' }: { name: string; size?: 'tiny' | 'default' | 'xl' }) {
-  const src = avatarByPlayer[playerKey(name)];
-  const classes = `avatar player-avatar${size === 'default' ? '' : ` ${size}`}`;
+  const key = playerKey(name);
+  const src = avatarByPlayer[key];
+  const classes = `avatar player-avatar avatar-${key}${size === 'default' ? '' : ` ${size}`}`;
 
   return (
     <span className={classes} aria-hidden="true">

@@ -148,6 +148,10 @@ const ceciFavoriteLosses = ceciFavoriteRecord.filter((pick) => pick.result === '
 const ceciFavoritePushes = ceciFavoriteRecord.filter((pick) => pick.result === 'P').length;
 const joe = lifetimeRecords.Joe;
 const brad = lifetimeRecords.Brad;
+const aj = lifetimeRecords.AJ;
+const kohler = lifetimeRecords.Kohler;
+const blaineSeasonThree = historicalSeasons[3].records.Blaine;
+const steve = lifetimeRecords.Steve;
 const ironLock = [...allTimeStandings].sort((a, b) => b.wins - a.wins)[0];
 
 export type Accolade = {
@@ -223,18 +227,53 @@ export const accolades: Accolade[] = [
     tone: 'gold',
   },
   {
-    title: 'THE .500 MACHINE',
+    title: 'SOPHOMORE SURGE',
     player: 'Joe',
     stat: `${joe.wins}-${joe.losses}-${joe.pushes}`,
-    detail: 'After 144 recorded picks: exactly as many wins as losses. Factory calibrated.',
+    detail: `The Mortal Locks II champion owns ${joe.wins} career wins, including a blistering 22-11 title run.`,
     tone: 'cyan',
   },
   {
     title: 'BY A NOSE',
     player: 'Brad',
     stat: `${brad.wins}-${brad.losses}-${brad.pushes}`,
-    detail: 'One win above the break-even line after 144 recorded picks. Every pixel counts.',
+    detail: `The Mortal Locks IV champion is ${brad.wins - brad.losses} wins above the break-even line. Every pixel counts.`,
     tone: 'gold',
+  },
+  {
+    title: "CAN'T WIN THE BIG ONE",
+    player: 'Kev',
+    stat: '0 LEAGUE TITLES',
+    detail: 'A decorated regular-season résumé, but the Mortal Locks crown remains the final boss.',
+    tone: 'red',
+  },
+  {
+    title: 'FROM THE ABYSS',
+    player: 'AJ',
+    stat: `ML V: 12-22-2 · CAREER: ${aj.wins}-${aj.losses}-${aj.pushes}`,
+    detail: 'Climbed out of the worst recorded season and returned to claim the Mortal Locks VII crown.',
+    tone: 'red',
+  },
+  {
+    title: 'EXPANSION KING',
+    player: 'Kohler',
+    stat: `${kohler.wins}-${kohler.losses}-${kohler.pushes} · ML VI CHAMPION`,
+    detail: 'Joined the field in Mortal Locks VI and immediately put his name on the trophy.',
+    tone: 'gold',
+  },
+  {
+    title: 'MIAMI VICE',
+    player: 'Blaine',
+    stat: `${blaineSeasonThree.wins}-${blaineSeasonThree.losses}-${blaineSeasonThree.pushes} · ML III RUNNER-UP`,
+    detail: 'The best non-champion record recovered from the damaged Miami Nights tape.',
+    tone: 'purple',
+  },
+  {
+    title: 'NEVER MISSED A SNAP',
+    player: 'Steve',
+    stat: `${steve.wins + steve.losses + steve.pushes} PICKS · ML V–VII`,
+    detail: 'Three complete 36-pick seasons in the restored vault. No absences, no excuses.',
+    tone: 'cyan',
   },
 ];
 
@@ -262,12 +301,12 @@ export const teamAccolades: Accolade[] = [
   },
 ];
 
-export const provisionalChampions = [
-  { season: 1, title: 'The First Lock', champion: 'Brad' },
-  { season: 2, title: 'The Sequel', champion: 'Joe' },
-  { season: 3, title: 'Third Time Is Mortal', champion: 'Ceci' },
-  { season: 4, title: 'Burn The Boats', champion: 'Jay' },
-  { season: 5, title: 'Become Death', champion: 'AJ' },
+export const champions = [
+  { season: 1, title: 'Vault Tape Damaged', champion: 'Jay' },
+  { season: 2, title: 'Vault Tape Damaged', champion: 'Joe' },
+  { season: 3, title: 'Miami Nights', champion: 'Jay' },
+  { season: 4, title: 'Burn The Boats', champion: 'Brad' },
+  { season: 5, title: 'Become Death', champion: 'Jay' },
   { season: 6, title: 'KEV-olutionary War', champion: 'Kohler' },
-  { season: 7, title: 'All In', champion: 'Kev' },
+  { season: 7, title: 'All In', champion: 'AJ' },
 ] as const;

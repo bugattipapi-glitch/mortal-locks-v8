@@ -84,7 +84,8 @@ export async function SiteShell({
       <div className="footer-signoff">
         <span>CHANNEL 8 · PUBLIC ACCESS SPORTS · {resolvedSeason.status}</span>
         <span className="audio-credit">“THE GAMES” BY ERIC MATYAS · SOUNDIMAGE.ORG</span>
-        <Link href="/admin">COMMISSIONER LOGIN</Link>
+        <Link className="desktop-commissioner-link" href="/admin">COMMISSIONER LOGIN</Link>
+        <Link className="mobile-commissioner-link" href="/admin">COMMISSIONER</Link>
       </div>
       {resolvedRecap && <BroadcastRecap recap={resolvedRecap} />}
     </div>
