@@ -1,13 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { demoScores } from '../lib/data';
 
 type Score = (typeof demoScores)[number];
 
 export function ScoreTicker() {
-  const router = useRouter();
   const [scores, setScores] = useState<Score[]>(demoScores);
   const [updatedAt, setUpdatedAt] = useState<string>('PREVIEW');
   const [mode, setMode] = useState('demo');
@@ -31,13 +29,9 @@ export function ScoreTicker() {
 
   useEffect(() => {
     refresh();
-    const scoreTimer = window.setInterval(refresh, 60_000);
-    const pageTimer = window.setInterval(() => router.refresh(), 5 * 60_000);
-    return () => {
-      window.clearInterval(scoreTimer);
-      window.clearInterval(pageTimer);
-    };
-  }, [refresh, router]);
+    const timer = window.setInterval(refresh, 60_000);
+    return () => window.clearInterval(timer);
+  }, [refresh]);
 
   return (
     <section className="score-strip" aria-label="Picked games scoreboard">
