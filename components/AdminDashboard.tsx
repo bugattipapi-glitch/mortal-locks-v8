@@ -2,13 +2,18 @@
 
 import { useMemo, useState } from 'react';
 import {
+  addDeadTeamAction,
+  addLockOffAction,
   addPlayerAction,
+  deleteDeadTeamAction,
+  deleteLockOffAction,
   logoutAction,
   overrideResultAction,
   savePickAction,
   saveParsedPicksAction,
   saveSeasonAction,
   setPlayerActiveAction,
+  syncScoresAction,
 } from '../app/admin/actions';
 import { commentaryRules } from '../lib/data';
 import type { RuntimeSnapshot } from '../lib/runtime-data';
@@ -27,10 +32,23 @@ const noticeCopy: Record<string, string> = {
   'player-added': 'PLAYER ADDED TO ROSTER',
   'roster-updated': 'ROSTER STATUS UPDATED',
   'pick-saved': 'WEEKLY PICK SAVED',
-  'result-saved': 'MANUAL RESULT LOCKED',
+  'result-saved': 'RESULT + BOOTH CALL UPDATED',
+  'pick-deleted': 'LOCK DELETED · THAT SLOT IS OPEN AGAIN',
   'text-picks-saved': 'TEXT PICKS IMPORTED',
   'season-reset': 'SEASON TEST DATA CLEARED · WEEK 1 PRESEASON RESTORED',
+  'dead-team-added': 'NEW HEADSTONE ADDED',
+  'dead-team-removed': 'HEADSTONE REMOVED',
+  'lock-off-added': 'LOCK-OFF ALERT ADDED',
+  'lock-off-removed': 'LOCK-OFF ALERT REMOVED',
+  'scores-sync-failed': 'SCORE FEED DID NOT RESPOND · PICKS UNCHANGED · USE MANUAL OVERRIDE OR TRY AGAIN',
 };
+
+function noticeMessage(notice?: string) {
+  if (!notice) return null;
+  const scoreSync = notice.match(/^scores-synced-(\d+)-(\d+)$/);
+  if (scoreSync) return `SCORE SYNC COMPLETE · ${scoreSync[1]} LOCK${scoreSync[1] === '1' ? '' : 'S'} UPDATED · ${scoreSync[2]} FINAL${scoreSync[2] === '1' ? '' : 'S'} MATCHED`;
+  return noticeCopy[notice] ?? null;
+}
 
 function parsePreview(raw: string) {
   const normalized = raw.trim().toUpperCase();
@@ -60,6 +78,7 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
     [activePlayers, textPicks, textSport],
   );
   const readyTextPicks = parsedTextPicks.filter((pick) => pick.ready);
+  const resolvedNotice = noticeMessage(notice);
 
   return (
     <div className="admin-grid">
@@ -70,7 +89,7 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
           <b>{snapshot.dataMode === 'database' ? 'DATABASE ONLINE' : 'LOCAL PREVIEW · SAVES DISABLED'}</b>
           <form action={logoutAction}><button>LOG OUT</button></form>
         </div>
-        {notice && noticeCopy[notice] && <div className="admin-notice" role="status">✓ {noticeCopy[notice]}</div>}
+        {resolvedNotice && <div className="admin-notice" role="status">✓ {resolvedNotice}</div>}
 
         <form className="admin-section" action={saveSeasonAction}>
           <h2>SEASON SETUP</h2>
@@ -108,10 +127,55 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
         <div className="admin-section">
           <h2>SCORE CONTROL STATUS</h2>
           <div className="system-status-grid">
-            <div><span className="database-light online" /><b>MANUAL RESULTS</b><small>OPERATIONAL</small></div>
-            <div><span className="database-light online" /><b>SPORTS FEED</b><small>LIVE PICK MATCHING</small></div>
+            <div><span className="database-light online" /><b>AUTO RESULTS</b><small>DAILY SCORE SYNC</small></div>
+            <div><span className="database-light online" /><b>MANUAL FALLBACK</b><small>OVERRIDES READY</small></div>
           </div>
-          <p className="helper">The ticker looks up pending picks against the live NFL/college scoreboard every minute. Broadcast status does not control the feed. Results still require commissioner grading so spreads, totals, first halves, and pushes remain exact.</p>
+          <p className="helper">The score job settles supported full-game spreads, totals, and straight-up picks every morning. Broadcast status does not control it. First-half, first-quarter, unmatched, or unusual pick text stays pending for manual review.</p>
+          <form action={syncScoresAction}><button className="primary-button" type="submit">RUN SCORE SYNC NOW</button></form>
+        </div>
+
+        <div className="admin-section managed-content-section">
+          <h2>DEAD TEAMS</h2>
+          <form action={addDeadTeamAction}>
+            <input type="hidden" name="seasonNumber" value={snapshot.season.number} />
+            <div className="admin-form-grid">
+              <label>Team / abbreviation<input name="teamName" placeholder="NYJ" minLength={2} maxLength={28} required /></label>
+              <label>Cause of death<input name="reason" placeholder="HOPE DIED" minLength={2} maxLength={54} required /></label>
+            </div>
+            <button className="primary-button" type="submit">+ ADD HEADSTONE</button>
+          </form>
+          <div className="admin-managed-list">
+            {snapshot.deadTeams.length ? snapshot.deadTeams.map((team) => (
+              <form action={deleteDeadTeamAction} key={team.id}>
+                <input type="hidden" name="id" value={team.id} />
+                <input type="hidden" name="seasonNumber" value={snapshot.season.number} />
+                <span><b>{team.teamName}</b><small>{team.reason}</small></span><button type="submit">REMOVE</button>
+              </form>
+            )) : <div className="parse-placeholder">NO DEAD TEAMS ON THE ACTIVE TAPE</div>}
+          </div>
+        </div>
+
+        <div className="admin-section managed-content-section">
+          <h2>LOCK-OFF ALERTS</h2>
+          <form action={addLockOffAction}>
+            <input type="hidden" name="seasonNumber" value={snapshot.season.number} />
+            <div className="admin-form-grid lock-off-form-grid">
+              <label>Week<select name="week" defaultValue={snapshot.season.currentWeek}>{Array.from({ length: 18 }, (_, index) => index + 1).map((number) => <option key={number} value={number}>Week {number}</option>)}</select></label>
+              <label>Side A<input name="sideA" placeholder="BLAINE O43" minLength={2} maxLength={48} required /></label>
+              <label>Side B<input name="sideB" placeholder="AJ U44.5" minLength={2} maxLength={48} required /></label>
+            </div>
+            <label>Lock-off call<input name="note" placeholder="THE MIDDLE IS ALIVE" minLength={2} maxLength={60} required /></label>
+            <button className="primary-button" type="submit">+ ADD LOCK-OFF</button>
+          </form>
+          <div className="admin-managed-list">
+            {snapshot.lockOffs.length ? snapshot.lockOffs.map((lockOff) => (
+              <form action={deleteLockOffAction} key={lockOff.id}>
+                <input type="hidden" name="id" value={lockOff.id} />
+                <input type="hidden" name="seasonNumber" value={snapshot.season.number} />
+                <span><b>W{lockOff.week} · {lockOff.sideA} VS {lockOff.sideB}</b><small>{lockOff.note}</small></span><button type="submit">REMOVE</button>
+              </form>
+            )) : <div className="parse-placeholder">NO LOCK-OFFS ON THE ACTIVE TAPE</div>}
+          </div>
         </div>
 
         <div className="admin-section danger-zone">
@@ -190,7 +254,12 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
                 <input type="hidden" name="playerSlug" value={pick.playerSlug} />
                 <input type="hidden" name="slot" value={pick.slot} />
                 <span><b>{pick.playerName} · P{pick.slot}</b><small>{pick.bet}{pick.manualOverride ? ' · MANUAL LOCK' : ''}</small></span>
-                <select name="result" defaultValue={pick.result}><option value="PENDING">PENDING</option><option value="LIVE">LIVE</option><option value="W">WIN</option><option value="L">LOSS</option><option value="P">PUSH</option></select>
+                <select name="result" defaultValue={pick.result} aria-label={`${pick.playerName} pick ${pick.slot} result`}><option value="PENDING">PENDING</option><option value="LIVE">LIVE</option><option value="W">WIN</option><option value="L">LOSS</option><option value="P">PUSH</option><option value="DELETE">DELETE LOCK</option></select>
+                <select name="commentary" defaultValue={pick.commentary} aria-label={`${pick.playerName} pick ${pick.slot} booth call`}>
+                  <option value="">NO BOOTH CALL</option>
+                  {pick.commentary && !commentaryRules.some((rule) => rule.label === pick.commentary) && <option value={pick.commentary}>{pick.commentary}</option>}
+                  {commentaryRules.map((rule) => <option value={rule.label} key={rule.label}>{rule.label}</option>)}
+                </select>
                 <button type="submit">LOCK</button>
               </form>
             )) : <div className="parse-placeholder">NO PICKS ENTERED FOR WEEK {week}</div>}
@@ -199,7 +268,7 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
 
         <div className="admin-section">
           <h2>COMMENTARY ENGINE</h2>
-          <p className="helper">Aim for roughly 25% of picks. Not every ticket needs a rimshot.</p>
+          <p className="helper">Calls are commissioner-assigned, not guessed by the score feed. A selected call feeds the next weekly recap; choose NO BOOTH CALL and lock the override to remove one.</p>
           <div className="rule-list">{commentaryRules.map((rule) => <div key={rule.label}><b>{rule.label}</b><span>{rule.detail}</span></div>)}</div>
         </div>
       </section>

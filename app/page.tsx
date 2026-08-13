@@ -27,6 +27,7 @@ export default async function HomePage() {
   const activePlayers = snapshot.players.filter((player) => player.active);
   const recap = buildBroadcastRecap(snapshot);
   const streaks = calculatePlayerStreaks(snapshot);
+  const currentLockOffs = snapshot.lockOffs.filter((lockOff) => lockOff.week === snapshot.season.currentWeek);
   const weekRows = activePlayers.map((player) => ({
     player,
     picks: snapshot.picks
@@ -85,9 +86,15 @@ export default async function HomePage() {
 
         <aside className="sidebar-stack">
           <section className="panel alert-panel">
-            <div className="panel-title purple-title">LOCK-OFF ALERT</div>
-            <div className="alert-copy">BLAINE O43 <span>VS</span> AJ U44.5</div>
-            <div className="neon-note">THE MIDDLE IS ALIVE</div>
+            <div className="panel-title purple-title">LOCK-OFF ALERT{currentLockOffs.length === 1 ? '' : 'S'}</div>
+            <div className="lock-off-list">
+              {currentLockOffs.length ? currentLockOffs.map((lockOff) => (
+                <article key={lockOff.id}>
+                  <div className="alert-copy">{lockOff.sideA} <span>VS</span> {lockOff.sideB}</div>
+                  <div className="neon-note">{lockOff.note}</div>
+                </article>
+              )) : <div className="sidebar-empty-state">NO ACTIVE LOCK-OFFS</div>}
+            </div>
           </section>
 
           <section className="panel standings-panel" id="standings">
@@ -112,9 +119,9 @@ export default async function HomePage() {
           <section className="panel dead-panel">
             <div className="panel-title red-title">DEAD TEAMS</div>
             <div className="graveyard">
-              <div className="grave"><span>RIP</span><b>NYJ</b><small>HOPE DIED</small></div>
-              <div className="grave"><span>RIP</span><b>ATL</b><small>BLEW IT</small></div>
-              <div className="grave"><span>RIP</span><b>WAS</b><small>NO COMMENT</small></div>
+              {snapshot.deadTeams.length ? snapshot.deadTeams.map((team) => (
+                <div className="grave" key={team.id}><span>RIP</span><b>{team.teamName}</b><small>{team.reason}</small></div>
+              )) : <div className="sidebar-empty-state graveyard-empty">THE GRAVEYARD IS QUIET</div>}
             </div>
           </section>
 

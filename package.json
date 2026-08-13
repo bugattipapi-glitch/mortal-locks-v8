@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "check": "node scripts/smoke-check.mjs"
+    "check": "node scripts/smoke-check.mjs && node scripts/score-feed-check.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

@@ -4,7 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { closeCommissionerSession, openCommissionerSession, requireCommissioner } from '../../lib/auth';
 import {
+  addRuntimeDeadTeam,
+  addRuntimeLockOff,
   addRuntimePlayer,
+  deleteRuntimeDeadTeam,
+  deleteRuntimeLockOff,
+  deleteRuntimePick,
   overrideRuntimeResult,
   resetRuntimeSeason,
   setRuntimePlayerActive,
@@ -12,7 +17,8 @@ import {
   upsertRuntimePick,
   upsertRuntimePicks,
 } from '../../lib/runtime-data';
-import type { Period, Result, Sport } from '../../lib/data';
+import { type Period, type Result, type Sport } from '../../lib/data';
+import { syncCompletedPicks } from '../../lib/score-sync';
 
 function value(formData: FormData, key: string) {
   return String(formData.get(key) ?? '').trim();
@@ -163,15 +169,88 @@ export async function saveParsedPicksAction(formData: FormData) {
 
 export async function overrideResultAction(formData: FormData) {
   await requireCommissioner();
-  const result = value(formData, 'result') as Result;
+  const resultChoice = value(formData, 'result');
+  const seasonNumber = integer(formData, 'seasonNumber', 1, 99);
+  const week = integer(formData, 'week', 1, 18);
+  const playerSlug = value(formData, 'playerSlug');
+  const slot = integer(formData, 'slot', 1, 2);
+  if (!/^[a-z0-9-]+$/.test(playerSlug)) throw new Error('Invalid player.');
+  if (resultChoice === 'DELETE') {
+    await deleteRuntimePick({ seasonNumber, week, playerSlug, slot });
+    refreshPublicPages();
+    redirect('/admin?notice=pick-deleted');
+  }
+  const result = resultChoice as Result;
   if (!['W', 'L', 'P', 'PENDING', 'LIVE'].includes(result)) throw new Error('Invalid result.');
+  const commentary = value(formData, 'commentary').slice(0, 80).toUpperCase();
   await overrideRuntimeResult({
-    seasonNumber: integer(formData, 'seasonNumber', 1, 99),
-    week: integer(formData, 'week', 1, 18),
-    playerSlug: value(formData, 'playerSlug'),
-    slot: integer(formData, 'slot', 1, 2),
+    seasonNumber,
+    week,
+    playerSlug,
+    slot,
     result,
+    commentary,
   });
   refreshPublicPages();
   redirect('/admin?notice=result-saved');
+}
+
+export async function syncScoresAction() {
+  await requireCommissioner();
+  let result: Awaited<ReturnType<typeof syncCompletedPicks>>;
+  try {
+    result = await syncCompletedPicks();
+  } catch (error) {
+    console.error('Manual score sync failed.', error);
+    redirect('/admin?notice=scores-sync-failed');
+  }
+  refreshPublicPages();
+  redirect(`/admin?notice=scores-synced-${result.updated}-${result.matched}`);
+}
+
+export async function addDeadTeamAction(formData: FormData) {
+  await requireCommissioner();
+  const teamName = value(formData, 'teamName').replace(/\s+/g, ' ').slice(0, 28).toUpperCase();
+  const reason = value(formData, 'reason').replace(/\s+/g, ' ').slice(0, 54).toUpperCase();
+  if (teamName.length < 2 || reason.length < 2) throw new Error('Dead team name and reason are required.');
+  await addRuntimeDeadTeam({ seasonNumber: integer(formData, 'seasonNumber', 1, 99), teamName, reason });
+  refreshPublicPages();
+  redirect('/admin?notice=dead-team-added');
+}
+
+export async function deleteDeadTeamAction(formData: FormData) {
+  await requireCommissioner();
+  await deleteRuntimeDeadTeam({
+    id: integer(formData, 'id', 1, 2147483647),
+    seasonNumber: integer(formData, 'seasonNumber', 1, 99),
+  });
+  refreshPublicPages();
+  redirect('/admin?notice=dead-team-removed');
+}
+
+export async function addLockOffAction(formData: FormData) {
+  await requireCommissioner();
+  const sideA = value(formData, 'sideA').replace(/\s+/g, ' ').slice(0, 48).toUpperCase();
+  const sideB = value(formData, 'sideB').replace(/\s+/g, ' ').slice(0, 48).toUpperCase();
+  const note = value(formData, 'note').replace(/\s+/g, ' ').slice(0, 60).toUpperCase();
+  if (sideA.length < 2 || sideB.length < 2 || note.length < 2) throw new Error('Both lock-off sides and a call are required.');
+  await addRuntimeLockOff({
+    seasonNumber: integer(formData, 'seasonNumber', 1, 99),
+    week: integer(formData, 'week', 1, 18),
+    sideA,
+    sideB,
+    note,
+  });
+  refreshPublicPages();
+  redirect('/admin?notice=lock-off-added');
+}
+
+export async function deleteLockOffAction(formData: FormData) {
+  await requireCommissioner();
+  await deleteRuntimeLockOff({
+    id: integer(formData, 'id', 1, 2147483647),
+    seasonNumber: integer(formData, 'seasonNumber', 1, 99),
+  });
+  refreshPublicPages();
+  redirect('/admin?notice=lock-off-removed');
 }

@@ -31,7 +31,7 @@ export type HistoricalSeason = {
 export const historicalSeasons: Record<number, HistoricalSeason> = {
   "1": {
     "number": 1,
-    "title": "Vault Tape Damaged",
+    "title": "The First Lock",
     "roster": [
       "Joe",
       "Jay",
@@ -62,7 +62,7 @@ export const historicalSeasons: Record<number, HistoricalSeason> = {
   },
   "2": {
     "number": 2,
-    "title": "Vault Tape Damaged",
+    "title": "The Sequel",
     "roster": [
       "Joe",
       "Brad",

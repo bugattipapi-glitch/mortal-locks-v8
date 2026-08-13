@@ -8,6 +8,7 @@ let cleanupTimer: number | null = null;
 
 export function HallNavLink({ active }: { active: boolean }) {
   const primeHallAudio = () => {
+    if (window.sessionStorage.getItem('ml8-hall-audio-muted') === '1') return;
     window.sessionStorage.setItem('ml8-hall-audio-primed', '1');
     const soundtrack = new Audio(HALL_TRACK);
     primedSoundtrack = soundtrack;

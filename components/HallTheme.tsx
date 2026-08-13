@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const HALL_TRACK = '/assets/audio/hall-fanfare.m4a';
+const HALL_MUTED_KEY = 'ml8-hall-audio-muted';
 
 export function HallTheme() {
   const [playing, setPlaying] = useState(false);
@@ -23,7 +24,9 @@ export function HallTheme() {
     if (playing) {
       audio.current.pause();
       setPlaying(false);
+      window.sessionStorage.setItem(HALL_MUTED_KEY, '1');
     } else {
+      window.sessionStorage.removeItem(HALL_MUTED_KEY);
       play();
     }
   };
@@ -34,13 +37,17 @@ export function HallTheme() {
     soundtrack.preload = 'auto';
     audio.current = soundtrack;
     const primed = window.sessionStorage.getItem('ml8-hall-audio-primed') === '1';
+    const userMuted = window.sessionStorage.getItem(HALL_MUTED_KEY) === '1';
     window.sessionStorage.removeItem('ml8-hall-audio-primed');
     window.dispatchEvent(new Event('ml8:hall-audio-mounted'));
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     soundtrack.addEventListener('play', onPlay);
     soundtrack.addEventListener('pause', onPause);
-    if (primed) {
+    if (userMuted) {
+      setPlaying(false);
+      setBlocked(false);
+    } else if (primed) {
       soundtrack.volume = 0.3;
       void soundtrack.play()
         .then(() => { setPlaying(true); setBlocked(false); })

@@ -14,7 +14,11 @@ export const allTimeStandings = Object.entries(lifetimeRecords)
     ...record,
     pct: pushNeutralPct(record.wins, record.losses),
   }))
-  .sort((a, b) => b.pct - a.pct || b.wins - a.wins || a.losses - b.losses || a.name.localeCompare(b.name));
+  .sort((a, b) => {
+    const displayedPctDifference = Math.round(b.pct * 1000) - Math.round(a.pct * 1000);
+    const pickDifference = (b.wins + b.losses + b.pushes) - (a.wins + a.losses + a.pushes);
+    return displayedPctDifference || pickDifference || b.wins - a.wins || a.name.localeCompare(b.name);
+  });
 
 type PickWithSeason = HistoricalPick & { season: number };
 
@@ -146,11 +150,8 @@ const ceciFavoriteRecord = allPicks.filter((pick) => pick.player === 'Ceci' && /
 const ceciFavoriteWins = ceciFavoriteRecord.filter((pick) => pick.result === 'W').length;
 const ceciFavoriteLosses = ceciFavoriteRecord.filter((pick) => pick.result === 'L').length;
 const ceciFavoritePushes = ceciFavoriteRecord.filter((pick) => pick.result === 'P').length;
-const joe = lifetimeRecords.Joe;
 const brad = lifetimeRecords.Brad;
-const aj = lifetimeRecords.AJ;
 const kohler = lifetimeRecords.Kohler;
-const blaineSeasonThree = historicalSeasons[3].records.Blaine;
 const steve = lifetimeRecords.Steve;
 const ironLock = [...allTimeStandings].sort((a, b) => b.wins - a.wins)[0];
 
@@ -227,13 +228,6 @@ export const accolades: Accolade[] = [
     tone: 'gold',
   },
   {
-    title: 'SOPHOMORE SURGE',
-    player: 'Joe',
-    stat: `${joe.wins}-${joe.losses}-${joe.pushes}`,
-    detail: `The Mortal Locks II champion owns ${joe.wins} career wins, including a blistering 22-11 title run.`,
-    tone: 'cyan',
-  },
-  {
     title: 'BY A NOSE',
     player: 'Brad',
     stat: `${brad.wins}-${brad.losses}-${brad.pushes}`,
@@ -248,13 +242,6 @@ export const accolades: Accolade[] = [
     tone: 'red',
   },
   {
-    title: 'FROM THE ABYSS',
-    player: 'AJ',
-    stat: `ML V: 12-22-2 · CAREER: ${aj.wins}-${aj.losses}-${aj.pushes}`,
-    detail: 'Climbed out of the worst recorded season and returned to claim the Mortal Locks VII crown.',
-    tone: 'red',
-  },
-  {
     title: 'EXPANSION KING',
     player: 'Kohler',
     stat: `${kohler.wins}-${kohler.losses}-${kohler.pushes} · ML VI CHAMPION`,
@@ -262,17 +249,10 @@ export const accolades: Accolade[] = [
     tone: 'gold',
   },
   {
-    title: 'MIAMI VICE',
-    player: 'Blaine',
-    stat: `${blaineSeasonThree.wins}-${blaineSeasonThree.losses}-${blaineSeasonThree.pushes} · ML III RUNNER-UP`,
-    detail: 'The best non-champion record recovered from the damaged Miami Nights tape.',
-    tone: 'purple',
-  },
-  {
     title: 'NEVER MISSED A SNAP',
     player: 'Steve',
     stat: `${steve.wins + steve.losses + steve.pushes} PICKS · ML V–VII`,
-    detail: 'Three complete 36-pick seasons in the restored vault. No absences, no excuses.',
+    detail: 'Despite constantly taking a beating, he strangely keeps showing up.',
     tone: 'cyan',
   },
 ];
@@ -302,8 +282,8 @@ export const teamAccolades: Accolade[] = [
 ];
 
 export const champions = [
-  { season: 1, title: 'Vault Tape Damaged', champion: 'Jay' },
-  { season: 2, title: 'Vault Tape Damaged', champion: 'Joe' },
+  { season: 1, title: 'The First Lock', champion: 'Jay' },
+  { season: 2, title: 'The Sequel', champion: 'Joe' },
   { season: 3, title: 'Miami Nights', champion: 'Jay' },
   { season: 4, title: 'Burn The Boats', champion: 'Brad' },
   { season: 5, title: 'Become Death', champion: 'Jay' },

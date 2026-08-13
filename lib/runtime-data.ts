@@ -35,6 +35,24 @@ export type RuntimePick = {
   updatedAt: string;
 };
 
+export type RuntimeDeadTeam = {
+  id: number;
+  seasonNumber: number;
+  teamName: string;
+  reason: string;
+  createdAt: string;
+};
+
+export type RuntimeLockOff = {
+  id: number;
+  seasonNumber: number;
+  week: number;
+  sideA: string;
+  sideB: string;
+  note: string;
+  createdAt: string;
+};
+
 export type RuntimeStanding = {
   name: string;
   wins: number;
@@ -47,6 +65,8 @@ export type RuntimeSnapshot = {
   season: RuntimeSeason;
   players: RuntimePlayer[];
   picks: RuntimePick[];
+  deadTeams: RuntimeDeadTeam[];
+  lockOffs: RuntimeLockOff[];
   standings: RuntimeStanding[];
   dataMode: 'database' | 'preview-fallback';
 };
@@ -88,25 +108,6 @@ function seedPlayerRows() {
   }));
 }
 
-function seedPickRows() {
-  return demoPicks.flatMap((row) =>
-    row.picks.map((pick, index) => ({
-      season_number: previewSeason.number,
-      week: previewSeason.currentWeek,
-      player_slug: playerSlug(row.player),
-      slot: index + 1,
-      sport: pick.sport,
-      game: pick.game,
-      bet: pick.bet,
-      result: pick.result,
-      period: pick.period ?? 'FULL',
-      force: pick.force ?? false,
-      manual_override: pick.manualOverride ?? false,
-      commentary: index === 0 ? row.note ?? '' : '',
-    })),
-  );
-}
-
 async function initializeDatabase(sql: Sql) {
   await sql`
     CREATE TABLE IF NOT EXISTS ml_settings (
@@ -144,6 +145,26 @@ async function initializeDatabase(sql: Sql) {
       PRIMARY KEY (season_number, week, player_slug, slot)
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS ml_dead_teams (
+      id bigserial PRIMARY KEY,
+      season_number integer NOT NULL,
+      team_name text NOT NULL,
+      reason text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS ml_lock_offs (
+      id bigserial PRIMARY KEY,
+      season_number integer NOT NULL,
+      week integer NOT NULL CHECK (week BETWEEN 1 AND 18),
+      side_a text NOT NULL,
+      side_b text NOT NULL,
+      note text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
 
   await sql`
     INSERT INTO ml_settings (key, value)
@@ -165,23 +186,6 @@ async function initializeDatabase(sql: Sql) {
     ON CONFLICT (slug) DO NOTHING
   `;
 
-  const picksJson = JSON.stringify(seedPickRows());
-  await sql`
-    INSERT INTO ml_picks (
-      season_number, week, player_slug, slot, sport, game, bet, result,
-      period, force, manual_override, commentary
-    )
-    SELECT
-      season_number, week, player_slug, slot, sport, game, bet, result,
-      period, force, manual_override, commentary
-    FROM jsonb_to_recordset(${picksJson}::jsonb)
-      AS incoming(
-        season_number integer, week integer, player_slug text, slot integer,
-        sport text, game text, bet text, result text, period text, force boolean,
-        manual_override boolean, commentary text
-      )
-    ON CONFLICT (season_number, week, player_slug, slot) DO NOTHING
-  `;
 }
 
 async function ensureDatabase() {
@@ -241,6 +245,14 @@ function previewSnapshot(): RuntimeSnapshot {
     season: { ...previewSeason },
     players,
     picks,
+    deadTeams: [
+      { id: 1, seasonNumber: previewSeason.number, teamName: 'NYJ', reason: 'HOPE DIED', createdAt: '' },
+      { id: 2, seasonNumber: previewSeason.number, teamName: 'ATL', reason: 'BLEW IT', createdAt: '' },
+      { id: 3, seasonNumber: previewSeason.number, teamName: 'WAS', reason: 'NO COMMENT', createdAt: '' },
+    ],
+    lockOffs: [
+      { id: 1, seasonNumber: previewSeason.number, week: previewSeason.currentWeek, sideA: 'BLAINE O43', sideB: 'AJ U44.5', note: 'THE MIDDLE IS ALIVE', createdAt: '' },
+    ],
     standings: calculateStandings(players, picks),
     dataMode: 'preview-fallback',
   };
@@ -271,13 +283,29 @@ type PickRow = {
   commentary: string;
   updated_at: string | Date;
 };
+type DeadTeamRow = {
+  id: number;
+  season_number: number;
+  team_name: string;
+  reason: string;
+  created_at: string | Date;
+};
+type LockOffRow = {
+  id: number;
+  season_number: number;
+  week: number;
+  side_a: string;
+  side_b: string;
+  note: string;
+  created_at: string | Date;
+};
 
 export async function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
   if (!getSql()) return previewSnapshot();
 
   try {
     const sql = await ensureDatabase();
-    const [settingRows, playerRows, pickRows] = await Promise.all([
+    const [settingRows, playerRows, pickRows, deadTeamRows, lockOffRows] = await Promise.all([
       sql`SELECT key, value FROM ml_settings`,
       sql`SELECT slug, name, short, avatar, active, sort_order FROM ml_players ORDER BY sort_order, name`,
       sql`
@@ -286,6 +314,8 @@ export async function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
         JOIN ml_players players ON players.slug = p.player_slug
         ORDER BY p.week, players.sort_order, p.slot
       `,
+      sql`SELECT id, season_number, team_name, reason, created_at FROM ml_dead_teams ORDER BY created_at, id`,
+      sql`SELECT id, season_number, week, side_a, side_b, note, created_at FROM ml_lock_offs ORDER BY week, created_at, id`,
     ]);
     const settings = Object.fromEntries((settingRows as unknown as SettingRow[]).map((row) => [row.key, row.value]));
     const season: RuntimeSeason = {
@@ -321,7 +351,27 @@ export async function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
         commentary: row.commentary,
         updatedAt: String(row.updated_at),
       }));
-    return { season, players, picks, standings: calculateStandings(players, picks), dataMode: 'database' };
+    const deadTeams: RuntimeDeadTeam[] = (deadTeamRows as unknown as DeadTeamRow[])
+      .filter((row) => row.season_number === season.number)
+      .map((row) => ({
+        id: Number(row.id),
+        seasonNumber: row.season_number,
+        teamName: row.team_name,
+        reason: row.reason,
+        createdAt: String(row.created_at),
+      }));
+    const lockOffs: RuntimeLockOff[] = (lockOffRows as unknown as LockOffRow[])
+      .filter((row) => row.season_number === season.number)
+      .map((row) => ({
+        id: Number(row.id),
+        seasonNumber: row.season_number,
+        week: row.week,
+        sideA: row.side_a,
+        sideB: row.side_b,
+        note: row.note,
+        createdAt: String(row.created_at),
+      }));
+    return { season, players, picks, deadTeams, lockOffs, standings: calculateStandings(players, picks), dataMode: 'database' };
   } catch (error) {
     console.error('Mortal Locks database fallback:', error);
     return previewSnapshot();
@@ -351,6 +401,8 @@ export async function resetRuntimeSeason(seasonNumber: number) {
   const activeSeason = Number((settingRows as unknown as Array<{ value: string }>)[0]?.value ?? previewSeason.number);
   if (seasonNumber !== activeSeason) throw new Error('Only the active season can be reset.');
   await sql`DELETE FROM ml_picks WHERE season_number = ${seasonNumber}`;
+  await sql`DELETE FROM ml_dead_teams WHERE season_number = ${seasonNumber}`;
+  await sql`DELETE FROM ml_lock_offs WHERE season_number = ${seasonNumber}`;
   const rows = JSON.stringify([
     { key: 'current_week', value: '1' },
     { key: 'status', value: 'PRESEASON' },
@@ -445,14 +497,99 @@ export async function overrideRuntimeResult(input: {
   playerSlug: string;
   slot: number;
   result: Result;
+  commentary: string;
 }) {
   const sql = await ensureDatabase();
   await sql`
     UPDATE ml_picks
-    SET result = ${input.result}, manual_override = true, updated_at = now()
+    SET result = ${input.result},
+        commentary = ${input.commentary},
+        manual_override = ${input.result !== 'PENDING'},
+        updated_at = now()
     WHERE season_number = ${input.seasonNumber}
       AND week = ${input.week}
       AND player_slug = ${input.playerSlug}
       AND slot = ${input.slot}
   `;
+}
+
+export async function deleteRuntimePick(input: {
+  seasonNumber: number;
+  week: number;
+  playerSlug: string;
+  slot: number;
+}) {
+  const sql = await ensureDatabase();
+  await sql`
+    DELETE FROM ml_picks
+    WHERE season_number = ${input.seasonNumber}
+      AND week = ${input.week}
+      AND player_slug = ${input.playerSlug}
+      AND slot = ${input.slot}
+  `;
+}
+
+export async function applyRuntimePickGrades(grades: Array<{
+  seasonNumber: number;
+  week: number;
+  playerSlug: string;
+  slot: number;
+  result: 'W' | 'L' | 'P';
+}>) {
+  if (!grades.length) return 0;
+  const sql = await ensureDatabase();
+  const rows = JSON.stringify(grades.map((grade) => ({
+    season_number: grade.seasonNumber,
+    week: grade.week,
+    player_slug: grade.playerSlug,
+    slot: grade.slot,
+    result: grade.result,
+  })));
+  const updated = await sql`
+    UPDATE ml_picks AS picks
+    SET result = incoming.result,
+        manual_override = false,
+        updated_at = now()
+    FROM jsonb_to_recordset(${rows}::jsonb)
+      AS incoming(season_number integer, week integer, player_slug text, slot integer, result text)
+    WHERE picks.season_number = incoming.season_number
+      AND picks.week = incoming.week
+      AND picks.player_slug = incoming.player_slug
+      AND picks.slot = incoming.slot
+      AND picks.result IN ('PENDING', 'LIVE')
+    RETURNING picks.player_slug
+  `;
+  return (updated as unknown as Array<{ player_slug: string }>).length;
+}
+
+export async function addRuntimeDeadTeam(input: { seasonNumber: number; teamName: string; reason: string }) {
+  const sql = await ensureDatabase();
+  await sql`
+    INSERT INTO ml_dead_teams (season_number, team_name, reason)
+    VALUES (${input.seasonNumber}, ${input.teamName}, ${input.reason})
+  `;
+}
+
+export async function deleteRuntimeDeadTeam(input: { id: number; seasonNumber: number }) {
+  const sql = await ensureDatabase();
+  await sql`DELETE FROM ml_dead_teams WHERE id = ${input.id} AND season_number = ${input.seasonNumber}`;
+}
+
+export async function addRuntimeLockOff(input: {
+  seasonNumber: number;
+  week: number;
+  sideA: string;
+  sideB: string;
+  note: string;
+}) {
+  const sql = await ensureDatabase();
+  await sql`
+    INSERT INTO ml_lock_offs (season_number, week, side_a, side_b, note)
+    VALUES (${input.seasonNumber}, ${input.week}, ${input.sideA}, ${input.sideB}, ${input.note})
+  `;
+}
+
+export async function deleteRuntimeLockOff(input: { id: number; seasonNumber: number }) {
+  const sql = await ensureDatabase();
+  await sql`DELETE FROM ml_lock_offs WHERE id = ${input.id} AND season_number = ${input.seasonNumber}`;
 }

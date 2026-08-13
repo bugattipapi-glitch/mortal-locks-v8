@@ -14,6 +14,7 @@ const required = [
   'app/hall-of-fame/trophy-room/page.tsx',
   'app/hall-of-fame/tape-vault/page.tsx',
   'app/api/scores/route.ts',
+  'app/api/cron/grade-picks/route.ts',
   'components/SiteShell.tsx',
   'components/BroadcastLauncher.tsx',
   'components/BroadcastRecap.tsx',
@@ -34,13 +35,16 @@ const required = [
   'lib/history.ts',
   'lib/runtime-data.ts',
   'lib/score-feed.ts',
+  'lib/score-sync.ts',
   'lib/pick-text-parser.ts',
+  'scripts/score-feed-check.mjs',
   'public/assets/booth-recap-a.jpg',
   'public/assets/booth-recap-b.jpg',
   'public/assets/booth-recap-gesture.jpg',
   'public/assets/mortal-locks-logo.png',
   'tsconfig.json',
-  'package.json'
+  'package.json',
+  'vercel.json'
 ];
 
 let failed = false;
