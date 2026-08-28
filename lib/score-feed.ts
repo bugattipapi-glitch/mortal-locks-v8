@@ -59,7 +59,13 @@ const teamAliases: Record<string, string[]> = {
 };
 
 function normalized(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['’ʻʼ`]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
 function tokens(value: string) {
@@ -98,18 +104,37 @@ function gameSides(game: string) {
     .filter(Boolean);
 }
 
-function matchesPick(event: EspnEvent, pick: RuntimePick) {
+function eventMatchQuality(event: EspnEvent, pick: RuntimePick) {
   const competitors = event.competitions?.[0]?.competitors ?? [];
-  if (competitors.length < 2) return false;
+  if (competitors.length < 2) return 0;
   const sides = gameSides(pick.game);
   if (sides.length >= 2) {
     const firstScores = competitors.map((competitor) => competitorMatchScore(sides[0], competitor));
     const secondScores = competitors.map((competitor) => competitorMatchScore(sides[1], competitor));
-    return firstScores.some((first, firstIndex) => first > 0 && secondScores.some((second, secondIndex) => second > 0 && firstIndex !== secondIndex));
+    return firstScores.some((first, firstIndex) => first > 0 && secondScores.some((second, secondIndex) => second > 0 && firstIndex !== secondIndex)) ? 3 : 0;
   }
-  const eventText = competitors.map(competitorText).join(' ');
-  const eventTokens = expandedTokens(eventText);
-  return [...expandedTokens(pick.game)].filter((token) => eventTokens.has(token)).length >= 2;
+
+  // Text imports sometimes put one team in `game` and the opponent in `bet`.
+  // Match the combined text only when it identifies both competitors.
+  const combinedScores = competitors.map((competitor) => competitorMatchScore(`${pick.game} ${pick.bet}`, competitor));
+  if (combinedScores.every((score) => score > 0)) return 2;
+
+  // A single team is usable only when it maps to one event in the fetched window.
+  // The cross-event uniqueness check happens in matchingEventsForPick.
+  const gameScores = competitors.map((competitor) => competitorMatchScore(pick.game, competitor));
+  const positiveScores = gameScores.filter((score) => score > 0);
+  return positiveScores.length === 1 ? 1 : 0;
+}
+
+function matchesPick(event: EspnEvent, pick: RuntimePick) {
+  return eventMatchQuality(event, pick) >= 2;
+}
+
+function matchingEventsForPick(events: EspnEvent[], pick: RuntimePick) {
+  const strongMatches = events.filter((event) => matchesPick(event, pick));
+  if (strongMatches.length) return strongMatches;
+  const singleTeamMatches = events.filter((event) => eventMatchQuality(event, pick) === 1);
+  return singleTeamMatches.length === 1 ? singleTeamMatches : [];
 }
 
 function scoreFromEvent(event: EspnEvent): TickerScore | null {
@@ -194,7 +219,7 @@ function gradeCompletedEvent(event: EspnEvent, pick: RuntimePick): CompletedPick
   } else {
     const spreadMatch = pick.bet.match(/^(.*?)\s*([+-]\s*[0-9]+(?:\.[0-9]+)?)\s*$/i);
     const selection = (spreadMatch?.[1] ?? pick.bet).replace(/\b(?:moneyline|money line|ml)\b/gi, '').trim();
-    const selected = selectedCompetitor(selection, competitors);
+    const selected = selectedCompetitor(selection, competitors) ?? selectedCompetitor(pick.game, competitors);
     if (!selected) return null;
     const opponent = competitors.find((competitor) => competitor !== selected);
     if (!opponent) return null;
@@ -217,7 +242,7 @@ export async function getPickedGameScores(picks: RuntimePick[], now = new Date()
   const relevant = picks.filter((pick) => pick.result === 'PENDING' || pick.result === 'LIVE');
   if (!relevant.length) return [];
   const events = await fetchRelevantEvents(relevant, now, 1, 7);
-  const matched = events.filter((event) => relevant.some((pick) => matchesPick(event, pick)));
+  const matched = relevant.flatMap((pick) => matchingEventsForPick(events, pick));
   return [...new Map(matched.map((event) => [event.id, event])).values()]
     .sort((left, right) => String(left.date).localeCompare(String(right.date)))
     .map(scoreFromEvent)
@@ -229,10 +254,10 @@ export async function getCompletedPickGrades(picks: RuntimePick[], now = new Dat
   if (!relevant.length) return [];
   const events = await fetchRelevantEvents(relevant, now, 8, 1);
   return relevant.flatMap((pick) => {
-    const event = events.find((candidate) => matchesPick(candidate, pick));
+    const event = matchingEventsForPick(events, pick)[0];
     const grade = event ? gradeCompletedEvent(event, pick) : null;
     return grade ? [grade] : [];
   });
 }
 
-export const scoreFeedInternals = { matchesPick, gradeCompletedEvent };
+export const scoreFeedInternals = { matchesPick, matchingEventsForPick, gradeCompletedEvent };
