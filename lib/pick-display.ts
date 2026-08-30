@@ -36,11 +36,17 @@ export function pickDisplay(pick: RuntimePick) {
   const spread = pick.bet.match(/^(.*?)\s*([+-]\s*[0-9]+(?:\.[0-9]+)?)\s*$/);
   if (spread) {
     const names = spread[1].split(/[,|]/).map((name) => name.trim()).filter(Boolean);
-    const selected = names.at(-1) ?? spread[1].trim();
     const gameTeams = pick.game.split(/\s+(?:vs\.?|versus|at)\s+|\s*@\s*/i).map((team) => team.trim()).filter(Boolean);
+    const legacySelected = gameTeams.length === 1 && spread[1].trim().toLowerCase().endsWith(gameTeams[0].toLowerCase())
+      ? gameTeams[0]
+      : null;
+    const selected = names.length > 1 ? names.at(-1)! : legacySelected ?? spread[1].trim();
+    const legacyOpponent = legacySelected
+      ? spread[1].trim().slice(0, -legacySelected.length).replace(/[,|]+$/, '').trim()
+      : '';
     const opponent = names.length > 1
       ? names.at(-2)!
-      : gameTeams.find((team) => team.toLowerCase() !== selected.toLowerCase()) ?? pick.game;
+      : legacyOpponent || gameTeams.find((team) => team.toLowerCase() !== selected.toLowerCase()) || pick.game;
     return { primary: `${selected} ${spread[2].replace(/\s/g, '')}`, secondary: `${period}vs ${opponent}` };
   }
   return { primary: pick.bet, secondary: `${period}${pick.game}` };
