@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { demoScores } from '../lib/data';
 
-type Score = (typeof demoScores)[number];
+type Score = (typeof demoScores)[number] & { startsAt?: string | null };
+
+function scoreState(score: Score) {
+  if (score.state !== 'SCHEDULED' || !score.startsAt) return score.state;
+  return new Date(score.startsAt).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }).toUpperCase();
+}
 
 export function ScoreTicker() {
   const [scores, setScores] = useState<Score[]>(demoScores);
@@ -42,7 +47,7 @@ export function ScoreTicker() {
       <div className="score-scroll">
         {scores.length ? scores.map((score) => (
           <div className="score-chip" key={score.id}>
-            <div className={score.live ? 'score-state live' : 'score-state'}>{score.state}</div>
+            <div className={score.live ? 'score-state live' : 'score-state'}>{scoreState(score)}</div>
             <div><b>{score.away}</b> {score.awayScore}</div>
             <div><b>{score.home}</b> {score.homeScore}</div>
           </div>

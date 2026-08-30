@@ -1,6 +1,8 @@
 export type Result = 'W' | 'L' | 'P' | 'PENDING' | 'LIVE';
 export type Sport = 'CFB' | 'NFL';
 export type Period = 'FULL' | '1H' | '1Q';
+export type Market = 'SPREAD' | 'TOTAL' | 'MONEYLINE';
+export type BetSide = 'HOME' | 'AWAY' | 'OVER' | 'UNDER';
 
 export type PickSelection = {
   sport: Sport;

@@ -1,4 +1,4 @@
-import type { Result } from './data';
+import type { Period, Result, Sport } from './data';
 import type { RuntimePick } from './runtime-data';
 
 export type TickerScore = {
@@ -9,7 +9,49 @@ export type TickerScore = {
   homeScore: number;
   state: string;
   live: boolean;
+  startsAt: string | null;
 };
+
+export type ScheduleTeam = {
+  id: string;
+  name: string;
+  shortName: string;
+  abbreviation: string;
+};
+
+export type ScheduledGame = {
+  eventId: string;
+  sport: Sport;
+  startsAt: string;
+  away: ScheduleTeam;
+  home: ScheduleTeam;
+};
+
+export type ScheduledGameCandidate = {
+  available: true;
+  eventId: string;
+  sport: Sport;
+  startsAt: string;
+  matchedTeamSide: 'HOME' | 'AWAY';
+  matchedTeam: ScheduleTeam;
+  opponent: ScheduleTeam;
+  away: ScheduleTeam;
+  home: ScheduleTeam;
+};
+
+export type UnavailableTeamCandidate = {
+  available: false;
+  eventId: null;
+  sport: Sport;
+  startsAt: null;
+  matchedTeamSide: null;
+  matchedTeam: ScheduleTeam;
+  opponent: null;
+  away: null;
+  home: null;
+};
+
+export type ScheduleCandidate = ScheduledGameCandidate | UnavailableTeamCandidate;
 
 export type CompletedPickGrade = {
   pick: RuntimePick;
@@ -18,18 +60,27 @@ export type CompletedPickGrade = {
   finalScore: string;
 };
 
+type EspnLineScore = { value?: number; displayValue?: string; period?: number };
+type EspnTeam = {
+  id?: string;
+  displayName?: string;
+  shortDisplayName?: string;
+  abbreviation?: string;
+  name?: string;
+  location?: string;
+};
 type EspnCompetitor = {
+  id?: string;
   homeAway?: 'home' | 'away';
   score?: string;
   winner?: boolean;
-  team?: { displayName?: string; shortDisplayName?: string; abbreviation?: string; name?: string; location?: string };
+  linescores?: EspnLineScore[];
+  team?: EspnTeam;
 };
-
 type EspnCompetition = {
   competitors?: EspnCompetitor[];
   status?: { type?: { state?: string; shortDetail?: string; detail?: string; completed?: boolean } };
 };
-
 type EspnEvent = {
   id?: string;
   name?: string;
@@ -37,12 +88,11 @@ type EspnEvent = {
   date?: string;
   competitions?: EspnCompetition[];
 };
-
 type EspnScoreboard = { events?: EspnEvent[] };
+type EspnTeamsFeed = { sports?: Array<{ leagues?: Array<{ teams?: Array<{ team?: EspnTeam }> }> }> };
 
 const SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/football';
-const ignoredTokens = new Set(['at', 'the', 'vs', 'versus', 'university', 'college', 'football']);
-
+const ignoredTokens = new Set(['at', 'the', 'vs', 'versus', 'university', 'college', 'football', 'state']);
 const teamAliases: Record<string, string[]> = {
   '49ers': ['san francisco', 'sf'],
   cardinals: ['arizona'],
@@ -50,6 +100,7 @@ const teamAliases: Record<string, string[]> = {
   chiefs: ['kansas city'],
   colts: ['indianapolis'],
   lions: ['detroit'],
+  'new mexico state': ['nm state', 'nmsu'],
   packers: ['green bay'],
   patriots: ['new england'],
   raiders: ['las vegas'],
@@ -77,7 +128,7 @@ function expandedTokens(value: string) {
   const result = new Set(tokens(value));
   for (const [nickname, aliases] of Object.entries(teamAliases)) {
     if (normalizedValue.includes(nickname) || aliases.some((alias) => normalizedValue.includes(alias))) {
-      result.add(nickname);
+      tokens(nickname).forEach((token) => result.add(token));
       aliases.flatMap(tokens).forEach((token) => result.add(token));
     }
   }
@@ -105,6 +156,7 @@ function gameSides(game: string) {
 }
 
 function eventMatchQuality(event: EspnEvent, pick: RuntimePick) {
+  if (pick.eventId) return event.id === pick.eventId ? 10 : 0;
   const competitors = event.competitions?.[0]?.competitors ?? [];
   if (competitors.length < 2) return 0;
   const sides = gameSides(pick.game);
@@ -114,16 +166,10 @@ function eventMatchQuality(event: EspnEvent, pick: RuntimePick) {
     return firstScores.some((first, firstIndex) => first > 0 && secondScores.some((second, secondIndex) => second > 0 && firstIndex !== secondIndex)) ? 3 : 0;
   }
 
-  // Text imports sometimes put one team in `game` and the opponent in `bet`.
-  // Match the combined text only when it identifies both competitors.
   const combinedScores = competitors.map((competitor) => competitorMatchScore(`${pick.game} ${pick.bet}`, competitor));
   if (combinedScores.every((score) => score > 0)) return 2;
-
-  // A single team is usable only when it maps to one event in the fetched window.
-  // The cross-event uniqueness check happens in matchingEventsForPick.
   const gameScores = competitors.map((competitor) => competitorMatchScore(pick.game, competitor));
-  const positiveScores = gameScores.filter((score) => score > 0);
-  return positiveScores.length === 1 ? 1 : 0;
+  return gameScores.filter((score) => score > 0).length === 1 ? 1 : 0;
 }
 
 function matchesPick(event: EspnEvent, pick: RuntimePick) {
@@ -131,6 +177,7 @@ function matchesPick(event: EspnEvent, pick: RuntimePick) {
 }
 
 function matchingEventsForPick(events: EspnEvent[], pick: RuntimePick) {
+  if (pick.eventId) return events.filter((event) => event.id === pick.eventId);
   const strongMatches = events.filter((event) => matchesPick(event, pick));
   if (strongMatches.length) return strongMatches;
   const singleTeamMatches = events.filter((event) => eventMatchQuality(event, pick) === 1);
@@ -144,7 +191,7 @@ function scoreFromEvent(event: EspnEvent): TickerScore | null {
   if (!away?.team || !home?.team) return null;
   const type = competition?.status?.type;
   const state = type?.state === 'pre'
-    ? (type.shortDetail ?? type.detail ?? 'SCHEDULED').toUpperCase()
+    ? 'SCHEDULED'
     : (type?.shortDetail ?? type?.detail ?? 'LIVE').toUpperCase();
   return {
     id: event.id ?? `${away.team.abbreviation}-${home.team.abbreviation}`,
@@ -154,36 +201,139 @@ function scoreFromEvent(event: EspnEvent): TickerScore | null {
     homeScore: Number(home.score ?? 0),
     state,
     live: type?.state === 'in' && !type.completed,
+    startsAt: event.date ?? null,
   };
 }
 
-function dateWindow(now: Date, daysBack: number, daysForward: number) {
-  const dates = [];
-  for (let offset = -daysBack; offset <= daysForward; offset += 1) {
-    const date = new Date(now);
-    date.setUTCDate(date.getUTCDate() + offset);
-    dates.push(date.toISOString().slice(0, 10).replaceAll('-', ''));
-  }
-  return `${dates[0]}-${dates.at(-1)}`;
+function dateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+export function weekDateRange(startDate: string, week: number) {
+  const anchor = new Date(`${startDate}T12:00:00.000Z`);
+  if (!Number.isFinite(anchor.getTime())) throw new Error('Invalid season start date.');
+  const daysSinceTuesday = (anchor.getUTCDay() - 2 + 7) % 7;
+  const start = new Date(anchor);
+  start.setUTCDate(start.getUTCDate() - daysSinceTuesday + ((week - 1) * 7));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 6);
+  const startDateKey = dateKey(start);
+  const endDateKey = dateKey(end);
+  return {
+    startDate: startDateKey,
+    endDate: endDateKey,
+    query: `${startDateKey.replaceAll('-', '')}-${endDateKey.replaceAll('-', '')}`,
+  };
 }
 
 async function fetchLeague(league: 'nfl' | 'college-football', dates: string) {
-  const response = await fetch(`${SCOREBOARD}/${league}/scoreboard?dates=${dates}&limit=100`, {
-    headers: { accept: 'application/json' },
-    next: { revalidate: 30 },
-  });
-  if (!response.ok) throw new Error(`Score provider returned ${response.status} for ${league}.`);
-  return response.json() as Promise<EspnScoreboard>;
+  let failure: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch(`${SCOREBOARD}/${league}/scoreboard?dates=${dates}&limit=100`, {
+        headers: { accept: 'application/json' },
+        next: { revalidate: 60 },
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!response.ok) throw new Error(`Score provider returned ${response.status} for ${league}.`);
+      return await response.json() as EspnScoreboard;
+    } catch (error) {
+      failure = error;
+    }
+  }
+  throw failure instanceof Error ? failure : new Error(`Score provider failed for ${league}.`);
 }
 
-async function fetchRelevantEvents(picks: RuntimePick[], now: Date, daysBack: number, daysForward: number) {
-  const sports = new Set(picks.map((pick) => pick.sport));
-  const dates = dateWindow(now, daysBack, daysForward);
-  const feeds = await Promise.all([
-    sports.has('NFL') ? fetchLeague('nfl', dates) : Promise.resolve({ events: [] }),
-    sports.has('CFB') ? fetchLeague('college-football', dates) : Promise.resolve({ events: [] }),
+async function fetchTeamDirectory(sport: Sport) {
+  const league = sport === 'NFL' ? 'nfl' : 'college-football';
+  const response = await fetch(`${SCOREBOARD}/${league}/teams?limit=500`, {
+    headers: { accept: 'application/json' },
+    next: { revalidate: 86_400 },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`Team directory returned ${response.status} for ${league}.`);
+  const feed = await response.json() as EspnTeamsFeed;
+  return feed.sports?.flatMap((sportEntry) => sportEntry.leagues ?? []).flatMap((leagueEntry) => leagueEntry.teams ?? []).flatMap((entry) => entry.team ? [entry.team] : []) ?? [];
+}
+
+async function fetchWeekEvents(sport: Sport, seasonStartDate: string, week: number) {
+  const league = sport === 'NFL' ? 'nfl' : 'college-football';
+  const feed = await fetchLeague(league, weekDateRange(seasonStartDate, week).query);
+  return feed.events ?? [];
+}
+
+function scheduledGameFromEvent(event: EspnEvent, sport: Sport): ScheduledGame | null {
+  const competitors = event.competitions?.[0]?.competitors ?? [];
+  const awayCompetitor = competitors.find((team) => team.homeAway === 'away');
+  const homeCompetitor = competitors.find((team) => team.homeAway === 'home');
+  const away = awayCompetitor ? teamFromCompetitor(awayCompetitor) : null;
+  const home = homeCompetitor ? teamFromCompetitor(homeCompetitor) : null;
+  return event.id && event.date && away && home ? { eventId: event.id, sport, startsAt: event.date, away, home } : null;
+}
+
+export async function getScheduledGameById(sport: Sport, seasonStartDate: string, week: number, eventId: string) {
+  const events = await fetchWeekEvents(sport, seasonStartDate, week);
+  const event = events.find((candidate) => candidate.id === eventId);
+  return event ? scheduledGameFromEvent(event, sport) : null;
+}
+
+function teamFromCompetitor(competitor: EspnCompetitor): ScheduleTeam | null {
+  return teamFromEspnTeam(competitor.team);
+}
+
+function teamFromEspnTeam(team?: EspnTeam): ScheduleTeam | null {
+  if (!team?.id) return null;
+  const shortName = team.shortDisplayName ?? team.location ?? team.displayName ?? team.abbreviation ?? 'TEAM';
+  const hurricanes = normalized(team.location ?? '') === 'miami' && normalized(team.name ?? '') === 'hurricanes';
+  const miamiOhio = team.id === '193';
+  return {
+    id: team.id,
+    name: hurricanes ? 'University of Miami' : miamiOhio ? 'Miami (Ohio)' : (team.displayName ?? shortName),
+    shortName: hurricanes ? 'Miami' : miamiOhio ? 'Miami (Ohio)' : shortName,
+    abbreviation: team.abbreviation ?? shortName.slice(0, 5).toUpperCase(),
+  };
+}
+
+export async function searchScheduleCandidates(query: string, seasonStartDate: string, week: number) {
+  const needle = normalized(query);
+  if (needle.length < 2) return [];
+  const [nflEvents, cfbEvents, nflTeams, cfbTeams] = await Promise.all([
+    fetchWeekEvents('NFL', seasonStartDate, week),
+    fetchWeekEvents('CFB', seasonStartDate, week),
+    fetchTeamDirectory('NFL'),
+    fetchTeamDirectory('CFB'),
   ]);
-  return feeds.flatMap((feed) => feed.events ?? []);
+  const candidates: ScheduleCandidate[] = [];
+  for (const [sport, events, teams] of [['NFL', nflEvents, nflTeams], ['CFB', cfbEvents, cfbTeams]] as const) {
+    for (const rawTeam of teams) {
+      const matchedTeam = teamFromEspnTeam(rawTeam);
+      if (!matchedTeam) continue;
+      const searchable = normalized(`${matchedTeam.name} ${matchedTeam.shortName} ${matchedTeam.abbreviation} ${rawTeam.location ?? ''}`);
+      if (!searchable.includes(needle)) continue;
+      const event = events.find((scheduled) => scheduled.competitions?.[0]?.competitors?.some((competitor) => competitor.team?.id === matchedTeam.id));
+      const scheduledGame = event ? scheduledGameFromEvent(event, sport) : null;
+      if (!scheduledGame) {
+        candidates.push({ available: false, eventId: null, sport, startsAt: null, matchedTeamSide: null, matchedTeam, opponent: null, away: null, home: null });
+        continue;
+      }
+      const { away, home } = scheduledGame;
+      const matchedTeamSide = away.id === matchedTeam.id ? 'AWAY' : 'HOME';
+      candidates.push({
+        available: true,
+        eventId: scheduledGame.eventId,
+        sport,
+        startsAt: scheduledGame.startsAt,
+        matchedTeamSide,
+        matchedTeam,
+        opponent: matchedTeamSide === 'AWAY' ? home : away,
+        away,
+        home,
+      });
+    }
+  }
+  return candidates
+    .sort((left, right) => left.matchedTeam.name.localeCompare(right.matchedTeam.name) || String(left.startsAt).localeCompare(String(right.startsAt)))
+    .slice(0, 16);
 }
 
 function compare(value: number): Extract<Result, 'W' | 'L' | 'P'> {
@@ -200,64 +350,114 @@ function selectedCompetitor(selection: string, competitors: EspnCompetitor[]) {
   return ranked[0].competitor;
 }
 
+function competitorPeriodScore(competitor: EspnCompetitor, period: Period) {
+  if (period === 'FULL') {
+    const score = Number(competitor.score);
+    return Number.isFinite(score) ? score : null;
+  }
+  const wanted = period === '1Q' ? [1] : [1, 2];
+  const scores = wanted.map((quarter) => competitor.linescores?.find((line) => line.period === quarter)?.value);
+  return scores.every((score): score is number => typeof score === 'number')
+    ? scores.reduce((total, score) => total + score, 0)
+    : null;
+}
+
+function structuredSelectedCompetitor(pick: RuntimePick, competitors: EspnCompetitor[]) {
+  if (pick.selectionSide === 'HOME') return competitors.find((competitor) => competitor.homeAway === 'home') ?? null;
+  if (pick.selectionSide === 'AWAY') return competitors.find((competitor) => competitor.homeAway === 'away') ?? null;
+  return null;
+}
+
+function legacySelection(bet: string) {
+  const spreadMatch = bet.match(/^(.*?)\s*([+-]\s*[0-9]+(?:\.[0-9]+)?)\s*$/i);
+  const raw = (spreadMatch?.[1] ?? bet).replace(/\b(?:moneyline|money line|ml)\b/gi, '').trim();
+  return { spreadMatch, selection: raw.split(/[,|]/).at(-1)?.trim() ?? raw };
+}
+
 function gradeCompletedEvent(event: EspnEvent, pick: RuntimePick): CompletedPickGrade | null {
-  if (pick.period !== 'FULL') return null;
   const competition = event.competitions?.[0];
   if (!competition?.status?.type?.completed) return null;
   const competitors = competition.competitors ?? [];
   if (competitors.length !== 2) return null;
-  const scores = competitors.map((competitor) => Number(competitor.score));
-  if (scores.some((score) => !Number.isFinite(score))) return null;
-
-  const totalMatch = pick.bet.match(/(?:^|\b)(over|under|o|u)\s*([0-9]+(?:\.[0-9]+)?)/i);
+  const scores = competitors.map((competitor) => competitorPeriodScore(competitor, pick.period));
+  if (scores.some((score) => score === null)) return null;
+  const numericScores = scores as number[];
   let result: Extract<Result, 'W' | 'L' | 'P'> | null = null;
-  if (totalMatch) {
-    const total = scores[0] + scores[1];
-    const line = Number(totalMatch[2]);
-    const over = totalMatch[1].toLowerCase().startsWith('o');
-    result = compare(over ? total - line : line - total);
+
+  if (pick.market && pick.selectionSide) {
+    if (pick.market === 'TOTAL') {
+      if (pick.line === null || !['OVER', 'UNDER'].includes(pick.selectionSide)) return null;
+      const total = numericScores[0] + numericScores[1];
+      result = compare(pick.selectionSide === 'OVER' ? total - pick.line : pick.line - total);
+    } else {
+      const selected = structuredSelectedCompetitor(pick, competitors);
+      const opponent = competitors.find((competitor) => competitor !== selected);
+      if (!selected || !opponent) return null;
+      const selectedScore = competitorPeriodScore(selected, pick.period);
+      const opponentScore = competitorPeriodScore(opponent, pick.period);
+      if (selectedScore === null || opponentScore === null) return null;
+      const line = pick.market === 'SPREAD' ? (pick.line ?? 0) : 0;
+      result = compare(selectedScore + line - opponentScore);
+    }
   } else {
-    const spreadMatch = pick.bet.match(/^(.*?)\s*([+-]\s*[0-9]+(?:\.[0-9]+)?)\s*$/i);
-    const selection = (spreadMatch?.[1] ?? pick.bet).replace(/\b(?:moneyline|money line|ml)\b/gi, '').trim();
-    const selected = selectedCompetitor(selection, competitors) ?? selectedCompetitor(pick.game, competitors);
-    if (!selected) return null;
-    const opponent = competitors.find((competitor) => competitor !== selected);
-    if (!opponent) return null;
-    const selectedScore = Number(selected.score);
-    const opponentScore = Number(opponent.score);
-    const line = spreadMatch ? Number(spreadMatch[2].replace(/\s/g, '')) : 0;
-    result = compare(selectedScore + line - opponentScore);
+    const totalMatch = pick.bet.match(/(?:^|\b)(over|under|o|u)\s*([0-9]+(?:\.[0-9]+)?)/i);
+    if (totalMatch) {
+      const total = numericScores[0] + numericScores[1];
+      const line = Number(totalMatch[2]);
+      result = compare(totalMatch[1].toLowerCase().startsWith('o') ? total - line : line - total);
+    } else {
+      const { spreadMatch, selection } = legacySelection(pick.bet);
+      const selected = selectedCompetitor(selection, competitors) ?? selectedCompetitor(pick.game, competitors);
+      const opponent = competitors.find((competitor) => competitor !== selected);
+      if (!selected || !opponent) return null;
+      const selectedScore = competitorPeriodScore(selected, pick.period);
+      const opponentScore = competitorPeriodScore(opponent, pick.period);
+      if (selectedScore === null || opponentScore === null) return null;
+      const line = spreadMatch ? Number(spreadMatch[2].replace(/\s/g, '')) : 0;
+      result = compare(selectedScore + line - opponentScore);
+    }
   }
 
   const ticker = scoreFromEvent(event);
+  const periodLabel = pick.period === 'FULL' ? '' : `${pick.period} · `;
   return result && ticker ? {
     pick,
     result,
     eventId: ticker.id,
-    finalScore: `${ticker.away} ${ticker.awayScore} · ${ticker.home} ${ticker.homeScore}`,
+    finalScore: `${periodLabel}${ticker.away} ${numericScores[0]} · ${ticker.home} ${numericScores[1]}`,
   } : null;
 }
 
-export async function getPickedGameScores(picks: RuntimePick[], now = new Date()) {
-  const relevant = picks.filter((pick) => pick.result === 'PENDING' || pick.result === 'LIVE');
-  if (!relevant.length) return [];
-  const events = await fetchRelevantEvents(relevant, now, 1, 7);
-  const matched = relevant.flatMap((pick) => matchingEventsForPick(events, pick));
-  return [...new Map(matched.map((event) => [event.id, event])).values()]
-    .sort((left, right) => String(left.date).localeCompare(String(right.date)))
-    .map(scoreFromEvent)
-    .filter((score): score is TickerScore => score !== null);
+async function eventsForPicks(picks: RuntimePick[], seasonStartDate: string) {
+  const keys = [...new Set(picks.map((pick) => `${pick.sport}:${pick.week}`))];
+  const batches = await Promise.all(keys.map(async (key) => {
+    const [sport, week] = key.split(':') as [Sport, string];
+    return [key, await fetchWeekEvents(sport, seasonStartDate, Number(week))] as const;
+  }));
+  return new Map(batches);
 }
 
-export async function getCompletedPickGrades(picks: RuntimePick[], now = new Date()) {
-  const relevant = picks.filter((pick) => (pick.result === 'PENDING' || pick.result === 'LIVE') && pick.period === 'FULL');
+export async function getPickedGameScores(picks: RuntimePick[], seasonStartDate: string, week: number) {
+  const relevant = picks.filter((pick) => pick.week === week);
   if (!relevant.length) return [];
-  const events = await fetchRelevantEvents(relevant, now, 8, 1);
+  const eventsBySportWeek = await eventsForPicks(relevant, seasonStartDate);
+  const matched = relevant.flatMap((pick) => matchingEventsForPick(eventsBySportWeek.get(`${pick.sport}:${pick.week}`) ?? [], pick));
+  return [...new Map(matched.map((event) => [event.id, event])).values()]
+    .map(scoreFromEvent)
+    .filter((score): score is TickerScore => score !== null)
+    .sort((left, right) => Number(right.live) - Number(left.live) || String(left.startsAt).localeCompare(String(right.startsAt)));
+}
+
+export async function getCompletedPickGrades(picks: RuntimePick[], seasonStartDate: string) {
+  const relevant = picks.filter((pick) => pick.result === 'PENDING' || pick.result === 'LIVE');
+  if (!relevant.length) return [];
+  const eventsBySportWeek = await eventsForPicks(relevant, seasonStartDate);
   return relevant.flatMap((pick) => {
+    const events = eventsBySportWeek.get(`${pick.sport}:${pick.week}`) ?? [];
     const event = matchingEventsForPick(events, pick)[0];
     const grade = event ? gradeCompletedEvent(event, pick) : null;
     return grade ? [grade] : [];
   });
 }
 
-export const scoreFeedInternals = { matchesPick, matchingEventsForPick, gradeCompletedEvent };
+export const scoreFeedInternals = { matchesPick, matchingEventsForPick, gradeCompletedEvent, weekDateRange };

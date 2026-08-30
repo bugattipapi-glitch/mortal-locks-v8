@@ -6,9 +6,9 @@ import { spawnSync } from 'node:child_process';
 
 let source = await readFile(new URL('../lib/score-feed.ts', import.meta.url), 'utf8');
 source = source
-  .replace("import type { Result } from './data';", "type Result = 'W' | 'L' | 'P' | 'PENDING' | 'LIVE';")
+  .replace("import type { Period, Result, Sport } from './data';", "type Result = 'W' | 'L' | 'P' | 'PENDING' | 'LIVE'; type Period = 'FULL' | '1H' | '1Q'; type Sport = 'CFB' | 'NFL';")
   .replace("import type { RuntimePick } from './runtime-data';", 'type RuntimePick = any;')
-  .replace("next: { revalidate: 30 },", '');
+  .replaceAll(/next: \{ revalidate: [0-9_]+ \},/g, '');
 const checkDir = await mkdtemp(join(tmpdir(), 'ml8-score-feed-'));
 const sourcePath = join(checkDir, 'score-feed.ts');
 await writeFile(sourcePath, source);
@@ -55,8 +55,8 @@ function event(awayScore, homeScore, completed = true, options = {}) {
     competitions: [{
       status: { type: { state: completed ? 'post' : 'in', completed } },
       competitors: [
-        { homeAway: 'away', score: String(awayScore), team: away },
-        { homeAway: 'home', score: String(homeScore), team: home },
+        { homeAway: 'away', score: String(awayScore), linescores: options.awayLinescores, team: away },
+        { homeAway: 'home', score: String(homeScore), linescores: options.homeLinescores, team: home },
       ],
     }],
   };
@@ -91,6 +91,45 @@ assert.equal(scoreFeedInternals.matchesPick(hawaiiStanford, pick('Stanford Hawai
 assert.equal(scoreFeedInternals.matchesPick(uncTcu, pick('UNC TCU -8.5', 'TCU')), true);
 assert.equal(scoreFeedInternals.gradeCompletedEvent(hawaiiStanford, pick('Stanford Hawaii +4', 'Hawaii')).result, 'W');
 assert.equal(scoreFeedInternals.gradeCompletedEvent(uncTcu, pick('UNC TCU -8.5', 'TCU')).result, 'L');
+
+const virginiaNcState = event(8, 34, true, {
+  id: '401858202',
+  away: { id: '152', displayName: 'NC State Wolfpack', shortDisplayName: 'NC State', abbreviation: 'NCSU' },
+  home: { id: '258', displayName: 'Virginia Cavaliers', shortDisplayName: 'Virginia', abbreviation: 'UVA' },
+});
+assert.equal(scoreFeedInternals.gradeCompletedEvent(virginiaNcState, pick('NC State, Virginia -4', 'Virginia')).result, 'W');
+
+const nmsuFsu = event(17, 34, true, {
+  id: '401864570',
+  away: { id: '166', displayName: 'New Mexico State Aggies', shortDisplayName: 'New Mexico State', abbreviation: 'NMSU' },
+  home: { id: '52', displayName: 'Florida State Seminoles', shortDisplayName: 'Florida State', abbreviation: 'FSU' },
+});
+const jacksonvilleNdsu = event(7, 33, true, {
+  id: '401864577',
+  away: { id: '55', displayName: 'Jacksonville State Gamecocks', shortDisplayName: 'Jacksonville State', abbreviation: 'JVST' },
+  home: { id: '2449', displayName: 'North Dakota State Bison', shortDisplayName: 'North Dakota State', abbreviation: 'NDSU' },
+});
+const jayPick = pick('Florida State, NM State +31', 'NM State');
+assert.deepEqual(scoreFeedInternals.matchingEventsForPick([jacksonvilleNdsu, nmsuFsu], jayPick).map(({ id }) => id), ['401864570']);
+assert.equal(scoreFeedInternals.gradeCompletedEvent(nmsuFsu, jayPick).result, 'W');
+
+const periodGame = event(17, 34, true, {
+  id: 'period-test',
+  awayLinescores: [{ period: 1, value: 3 }, { period: 2, value: 7 }, { period: 3, value: 7 }, { period: 4, value: 0 }],
+  homeLinescores: [{ period: 1, value: 10 }, { period: 2, value: 7 }, { period: 3, value: 7 }, { period: 4, value: 10 }],
+});
+assert.equal(scoreFeedInternals.gradeCompletedEvent(periodGame, { ...pick('Packers +10'), period: '1Q' }).result, 'W');
+assert.equal(scoreFeedInternals.gradeCompletedEvent(periodGame, { ...pick('Under 28'), period: '1H' }).result, 'W');
+
+const structuredPick = {
+  ...pick('Steelers ML'),
+  eventId: '401999999',
+  market: 'MONEYLINE',
+  selectionSide: 'HOME',
+  line: null,
+};
+assert.equal(scoreFeedInternals.gradeCompletedEvent(event(17, 20), structuredPick).result, 'W');
+assert.deepEqual(scoreFeedInternals.weekDateRange('2026-08-29', 1), { startDate: '2026-08-25', endDate: '2026-08-31', query: '20260825-20260831' });
 
 const singleTeamPick = pick('Under 40', 'Bears');
 assert.deepEqual(scoreFeedInternals.matchingEventsForPick([bearsTitans, event(10, 10, false)], singleTeamPick).map(({ id }) => id), ['401874394']);

@@ -9,7 +9,6 @@ import {
   deleteLockOffAction,
   logoutAction,
   overrideResultAction,
-  savePickAction,
   saveParsedPicksAction,
   saveSeasonAction,
   setPlayerActiveAction,
@@ -20,12 +19,7 @@ import type { RuntimeSnapshot } from '../lib/runtime-data';
 import { parseTextPicks } from '../lib/pick-text-parser';
 import { PlayerAvatar } from './PlayerAvatar';
 import { SeasonResetControl } from './SeasonResetControl';
-
-const ambiguousAliases: Record<string, string[]> = {
-  OSU: ['OHIO STATE', 'OKLAHOMA STATE', 'OREGON STATE'],
-  USC: ['SOUTHERN CALIFORNIA', 'SOUTH CAROLINA'],
-  MSU: ['MICHIGAN STATE', 'MISSISSIPPI STATE'],
-};
+import { GamePickEntry } from './GamePickEntry';
 
 const noticeCopy: Record<string, string> = {
   'season-saved': 'SEASON SETTINGS SAVED',
@@ -50,28 +44,24 @@ function noticeMessage(notice?: string) {
   return noticeCopy[notice] ?? null;
 }
 
-function parsePreview(raw: string) {
-  const normalized = raw.trim().toUpperCase();
-  if (!normalized) return null;
-  const ambiguous = Object.entries(ambiguousAliases).find(([alias]) => new RegExp(`\\b${alias}\\b`).test(normalized));
-  if (ambiguous) return { kind: 'ambiguous' as const, text: normalized, alias: ambiguous[0], options: ambiguous[1] };
-  return { kind: 'ready' as const, text: normalized };
+function BoothCallSelect({ current, label }: { current: string; label: string }) {
+  const custom = !!current && !commentaryRules.some((rule) => rule.label === current);
+  const [choice, setChoice] = useState(custom ? 'OTHER' : current);
+  return <div className="override-call-control">
+    <select name="commentaryChoice" value={choice} onChange={(event) => setChoice(event.target.value)} aria-label={label}>
+      <option value="">NO BOOTH CALL</option>
+      {commentaryRules.map((rule) => <option value={rule.label} key={rule.label}>{rule.label}</option>)}
+      <option value="OTHER">OTHER — WRITE YOUR OWN</option>
+    </select>
+    {choice === 'OTHER' && <input name="commentaryCustom" defaultValue={custom ? current : ''} maxLength={80} placeholder="CUSTOM CALL" required />}
+  </div>;
 }
 
 export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot; notice?: string }) {
   const activePlayers = useMemo(() => snapshot.players.filter((player) => player.active), [snapshot.players]);
-  const [rawPick, setRawPick] = useState('');
-  const [game, setGame] = useState('');
-  const [selectedPlayer, setSelectedPlayer] = useState(activePlayers[0]?.slug ?? '');
-  const [slot, setSlot] = useState('1');
-  const [sport, setSport] = useState('CFB');
-  const [period, setPeriod] = useState('FULL');
   const [week, setWeek] = useState(String(snapshot.season.currentWeek));
-  const [isForce, setIsForce] = useState(false);
   const [textPicks, setTextPicks] = useState('');
   const [textSport, setTextSport] = useState<'CFB' | 'NFL'>('CFB');
-  const preview = useMemo(() => parsePreview(`${game} ${rawPick}`), [game, rawPick]);
-  const selectedName = snapshot.players.find((player) => player.slug === selectedPlayer)?.name ?? 'PLAYER';
   const visiblePicks = snapshot.picks.filter((pick) => pick.week === Number(week));
   const parsedTextPicks = useMemo(
     () => parseTextPicks(textPicks, activePlayers, textSport),
@@ -130,7 +120,7 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
             <div><span className="database-light online" /><b>AUTO RESULTS</b><small>DAILY SCORE SYNC</small></div>
             <div><span className="database-light online" /><b>MANUAL FALLBACK</b><small>OVERRIDES READY</small></div>
           </div>
-          <p className="helper">The score job settles supported full-game spreads, totals, and straight-up picks every morning. Broadcast status does not control it. First-half, first-quarter, unmatched, or unusual pick text stays pending for manual review.</p>
+          <p className="helper">The 5:00 AM Arizona score job settles event-linked full-game, first-half, and first-quarter spreads, totals, and even-money picks when the provider supplies period scores. Broadcast status does not control it. Legacy text-only or unusual picks remain available for manual review.</p>
           <form action={syncScoresAction}><button className="primary-button" type="submit">RUN SCORE SYNC NOW</button></form>
         </div>
 
@@ -211,38 +201,7 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
           </form>
           <p className="helper">If any line says CHECK, edit the pasted text or use the structured entry form below. Nothing partial is imported.</p>
         </div>
-        <form className="admin-section" action={savePickAction}>
-          <h2>STRUCTURED ENTRY · FALLBACK</h2>
-          <input type="hidden" name="seasonNumber" value={snapshot.season.number} />
-          <div className="admin-form-grid">
-            <label>Week<select name="week" value={week} onChange={(event) => setWeek(event.target.value)}>{Array.from({ length: 18 }, (_, index) => index + 1).map((number) => <option key={number} value={number}>Week {number}</option>)}</select></label>
-            <label>Player<select name="playerSlug" value={selectedPlayer} onChange={(event) => setSelectedPlayer(event.target.value)}>{activePlayers.map((player) => <option key={player.slug} value={player.slug}>{player.name}</option>)}</select></label>
-            <label>Pick slot<select name="slot" value={slot} onChange={(event) => setSlot(event.target.value)}><option value="1">Pick 1</option><option value="2">Pick 2</option></select></label>
-            <label>Sport<select name="sport" value={sport} onChange={(event) => setSport(event.target.value)}><option>CFB</option><option>NFL</option></select></label>
-            <label>Period<select name="period" value={period} onChange={(event) => setPeriod(event.target.value)}><option value="FULL">Full game</option><option value="1H">1st half</option><option value="1Q">1st quarter</option></select></label>
-            <label className="checkbox-line"><input name="force" type="checkbox" checked={isForce} onChange={(event) => setIsForce(event.target.checked)} /> Force pick</label>
-          </div>
-          <label>Game<input name="game" value={game} onChange={(event) => setGame(event.target.value)} placeholder="Ohio State vs Michigan" required /></label>
-          <label>Pick<input name="bet" value={rawPick} onChange={(event) => setRawPick(event.target.value)} placeholder="Ohio State -6.5" required /></label>
-          <label>Booth call (optional)<input name="commentary" placeholder="SOME SPREAD" maxLength={80} /></label>
-
-          {!preview && <div className="parse-placeholder">TYPE THE GAME AND PICK THE WAY YOU&apos;D TEXT THEM.</div>}
-          {preview?.kind === 'ambiguous' && (
-            <div className="parse-preview warning-preview">
-              <b>HOLD UP: “{preview.alias}” IS AMBIGUOUS</b>
-              <span>Spell out the team before saving: {preview.options.join(' / ')}.</span>
-            </div>
-          )}
-          {preview?.kind === 'ready' && (
-            <div className="parse-preview">
-              <small>CONFIRM BEFORE SAVE</small>
-              <b>{selectedName} · WEEK {week} · PICK {slot} · {sport}{period !== 'FULL' ? ` · ${period}` : ''}{isForce ? ' · FORCE' : ''}</b>
-              <span>{preview.text}</span>
-              <div><button type="submit">CONFIRM &amp; SAVE</button><button type="button" onClick={() => { setGame(''); setRawPick(''); }}>CLEAR</button></div>
-            </div>
-          )}
-          <p className="helper">Saving the same player/week/slot updates that pick without erasing a result you already graded.</p>
-        </form>
+        <GamePickEntry players={activePlayers} seasonNumber={snapshot.season.number} week={week} onWeekChange={setWeek} />
 
         <div className="admin-section">
           <h2>RESULT OVERRIDE · WEEK {week}</h2>
@@ -255,11 +214,7 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
                 <input type="hidden" name="slot" value={pick.slot} />
                 <span><b>{pick.playerName} · P{pick.slot}</b><small>{pick.bet}{pick.manualOverride ? ' · MANUAL LOCK' : ''}</small></span>
                 <select name="result" defaultValue={pick.result} aria-label={`${pick.playerName} pick ${pick.slot} result`}><option value="PENDING">PENDING</option><option value="LIVE">LIVE</option><option value="W">WIN</option><option value="L">LOSS</option><option value="P">PUSH</option><option value="DELETE">DELETE LOCK</option></select>
-                <select name="commentary" defaultValue={pick.commentary} aria-label={`${pick.playerName} pick ${pick.slot} booth call`}>
-                  <option value="">NO BOOTH CALL</option>
-                  {pick.commentary && !commentaryRules.some((rule) => rule.label === pick.commentary) && <option value={pick.commentary}>{pick.commentary}</option>}
-                  {commentaryRules.map((rule) => <option value={rule.label} key={rule.label}>{rule.label}</option>)}
-                </select>
+                <BoothCallSelect current={pick.commentary} label={`${pick.playerName} pick ${pick.slot} booth call`} />
                 <button type="submit">LOCK</button>
               </form>
             )) : <div className="parse-placeholder">NO PICKS ENTERED FOR WEEK {week}</div>}

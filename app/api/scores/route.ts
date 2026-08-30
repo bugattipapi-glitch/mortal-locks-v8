@@ -11,7 +11,7 @@ export async function GET() {
   const currentPicks = snapshot.picks.filter((pick) => pick.week === snapshot.season.currentWeek);
   if (!currentPicks.length) return NextResponse.json({ mode: 'demo', updatedAt, scores: demoScores });
   try {
-    const scores = await getPickedGameScores(currentPicks);
+    const scores = await getPickedGameScores(currentPicks, snapshot.season.startDate, snapshot.season.currentWeek);
     return NextResponse.json({ mode: scores.length ? 'live' : 'awaiting-match', updatedAt, scores });
   } catch (error) {
     console.error('Mortal Locks score feed fallback:', error);

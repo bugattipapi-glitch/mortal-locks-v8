@@ -70,7 +70,7 @@ a { color: inherit; text-decoration: none; }
 .cyan-title { background:linear-gradient(180deg,#143a42,#0d252a); color:#63f6ff; border-bottom:1px solid #2a7980; }
 .purple-title { background:linear-gradient(180deg,#421256,#210929); color:#e06cff; border-bottom:1px solid #8534a4; }
 .picks-table { width:100%; }
-.pick-row { display:grid; grid-template-columns:1.05fr 1.55fr 1.55fr 1fr 1.25fr; min-height:58px; border-bottom:1px solid #2b3137; align-items:center; }
+.pick-row { display:grid; grid-template-columns:.82fr 1.55fr .56fr .9fr 1.55fr .56fr .9fr; min-height:70px; border-bottom:1px solid #2b3137; align-items:center; }
 .pick-row > div { padding:7px 10px; min-width:0; }
 .pick-head { min-height:34px; color:#bfc7cb; font-size:12px; letter-spacing:.09em; background:#0b0d10; }
 .player-cell { display:flex; align-items:center; gap:9px; font-size:18px; }
@@ -96,7 +96,7 @@ a { color: inherit; text-decoration: none; }
 .status-pending { color:#b3bcc2; border-color:#48515a; background:#11161a; }
 .status-live { color:#ff4141; border-color:#a22929; background:#260707; animation:pulse 1.6s infinite; }
 @keyframes pulse { 50% { opacity:.6; } }
-.commentary-cell { color:var(--cyan); font-weight:900; font-size:13px; }
+.commentary-cell { color:var(--cyan); font-weight:900; font-size:10px; line-height:1.15; overflow-wrap:anywhere; }
 .force-tag { margin-right:7px; background:#6a167d; color:#f3a9ff; border:1px solid #b13ecb; padding:2px 4px; font-size:9px; }
 .panel-link { display:block; padding:11px 14px; text-align:right; color:#f0d066; font-size:13px; letter-spacing:.1em; }
 .sidebar-stack { display:flex; flex-direction:column; gap:12px; }
@@ -508,6 +508,7 @@ body::after {
   box-shadow:inset 0 0 36px #000;
 }
 .brand-logo {
+  display:block;
   position:relative;
   min-width:0;
   min-height:168px;
@@ -1133,6 +1134,28 @@ body::after {
 .admin-managed-list small { color:#7e898f; }
 .admin-managed-list button { padding:7px 9px; color:#ffadb1; border:1px solid #7f2930; background:#3a0b0f; }
 .managed-content-section .primary-button { margin-top:2px; }
+.canonical-pick-entry { background:linear-gradient(135deg,rgba(39,230,235,.055),transparent 46%); }
+.game-search-label { position:relative; }
+.game-search-results { display:grid; gap:5px; max-height:340px; margin:8px 0 14px; overflow:auto; }
+.game-search-results button { display:grid; grid-template-columns:minmax(120px,.85fr) minmax(180px,1.4fr); gap:12px; align-items:center; padding:10px; color:#e9eeee; border:1px solid #34464d; background:#080d10; text-align:left; }
+.game-search-results button:hover,.game-search-results button:focus-visible { border-color:var(--cyan); background:#0c2226; outline:none; }
+.game-search-results button:disabled { cursor:not-allowed; opacity:.48; border-style:dashed; }
+.game-search-results span { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.game-search-results b { color:#fff; font-size:15px; }
+.game-search-results strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.game-search-results small { color:#74858d; font-size:9px; text-transform:uppercase; }
+.selected-game-card { position:relative; display:grid; gap:5px; margin:9px 0 13px; padding:13px 112px 13px 13px; border:2px solid #2b777d; background:linear-gradient(135deg,#0b292c,#080c0f); }
+.selected-game-card b { color:#fff; font-size:20px; text-transform:uppercase; }
+.selected-game-card b em { color:#77868c; font-size:10px; font-style:normal; }
+.selected-game-card small { color:#93a1a7; }
+.selected-game-card button { position:absolute; right:9px; top:50%; padding:8px; color:#d2d9dc; border:1px solid #4b5960; background:#11181c; transform:translateY(-50%); }
+.wager-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.canonical-preview button { width:100%; margin-top:3px; }
+.canonical-preview button:disabled { opacity:.36; cursor:not-allowed; }
+.override-call-control { display:grid; gap:5px; min-width:0; }
+.override-call-control input { padding:8px; font-size:10px; }
+.mobile-booth-call { margin-top:3px; color:var(--cyan); font:400 7px/1.2 var(--font-display),sans-serif; font-style:normal; letter-spacing:.05em; white-space:normal; }
+.season-pick-card .season-pick-call { color:var(--cyan); white-space:normal; }
 
 .commissioner-login {
   position:relative;
@@ -1226,7 +1249,10 @@ body::after {
   .inline-add-player button { height:36px; }
   .system-status-grid { grid-template-columns:1fr; }
   .override-row { grid-template-columns:minmax(0,1fr) 88px 50px; }
-  .override-row select:nth-of-type(2) { grid-column:1 / -1; grid-row:2; }
+  .override-call-control { grid-column:1 / -1; grid-row:2; }
+  .game-search-results button { grid-template-columns:1fr; gap:5px; }
+  .selected-game-card { padding:11px; }
+  .selected-game-card button { position:static; width:max-content; transform:none; }
   .commissioner-login { min-height:400px; margin:16px auto; padding:36px 23px; }
   .commissioner-login h1 { font-size:42px; }
 }

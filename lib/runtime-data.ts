@@ -1,5 +1,14 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
-import { demoPicks, players as previewPlayers, season as previewSeason, type Period, type Result, type Sport } from './data';
+import {
+  demoPicks,
+  players as previewPlayers,
+  season as previewSeason,
+  type BetSide,
+  type Market,
+  type Period,
+  type Result,
+  type Sport,
+} from './data';
 
 export type RuntimeSeason = {
   number: number;
@@ -32,8 +41,21 @@ export type RuntimePick = {
   force: boolean;
   manualOverride: boolean;
   commentary: string;
+  eventId: string | null;
+  eventDate: string | null;
+  awayTeamId: string | null;
+  awayTeamName: string | null;
+  awayTeamAbbreviation: string | null;
+  homeTeamId: string | null;
+  homeTeamName: string | null;
+  homeTeamAbbreviation: string | null;
+  market: Market | null;
+  selectionSide: BetSide | null;
+  line: number | null;
   updatedAt: string;
 };
+
+export type RuntimePickInput = Omit<RuntimePick, 'playerName' | 'result' | 'manualOverride' | 'updatedAt'>;
 
 export type RuntimeDeadTeam = {
   id: number;
@@ -145,6 +167,17 @@ async function initializeDatabase(sql: Sql) {
       PRIMARY KEY (season_number, week, player_slug, slot)
     )
   `;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS event_id text`;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS event_date timestamptz`;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS away_team_id text`;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS away_team_name text`;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS away_team_abbreviation text`;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS home_team_id text`;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS home_team_name text`;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS home_team_abbreviation text`;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS market text`;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS selection_side text`;
+  await sql`ALTER TABLE ml_picks ADD COLUMN IF NOT EXISTS line numeric`;
   await sql`
     CREATE TABLE IF NOT EXISTS ml_dead_teams (
       id bigserial PRIMARY KEY,
@@ -185,6 +218,37 @@ async function initializeDatabase(sql: Sql) {
       AS incoming(slug text, name text, short text, avatar text, active boolean, sort_order integer)
     ON CONFLICT (slug) DO NOTHING
   `;
+
+  const correctionRows = await sql`
+    SELECT value
+    FROM ml_settings
+    WHERE key = 'migration_2026_week1_score_corrections'
+  `;
+  if (!(correctionRows as unknown as Array<{ value: string }>).length) {
+    await sql`
+      UPDATE ml_picks
+      SET result = 'W', manual_override = true, updated_at = now()
+      WHERE season_number = 8
+        AND week = 1
+        AND player_slug = 'joe'
+        AND slot = 2
+        AND lower(bet) LIKE '%virginia%'
+    `;
+    await sql`
+      UPDATE ml_picks
+      SET result = 'W', manual_override = true, updated_at = now()
+      WHERE season_number = 8
+        AND week = 1
+        AND player_slug = 'jay'
+        AND slot = 1
+        AND (lower(bet) LIKE '%nm state%' OR lower(bet) LIKE '%new mexico state%')
+    `;
+    await sql`
+      INSERT INTO ml_settings (key, value)
+      VALUES ('migration_2026_week1_score_corrections', 'applied')
+      ON CONFLICT (key) DO NOTHING
+    `;
+  }
 
 }
 
@@ -238,6 +302,17 @@ function previewSnapshot(): RuntimeSnapshot {
       force: pick.force ?? false,
       manualOverride: pick.manualOverride ?? false,
       commentary: index === 0 ? row.note ?? '' : '',
+      eventId: null,
+      eventDate: null,
+      awayTeamId: null,
+      awayTeamName: null,
+      awayTeamAbbreviation: null,
+      homeTeamId: null,
+      homeTeamName: null,
+      homeTeamAbbreviation: null,
+      market: null,
+      selectionSide: null,
+      line: null,
       updatedAt: '',
     })),
   );
@@ -281,6 +356,17 @@ type PickRow = {
   force: boolean;
   manual_override: boolean;
   commentary: string;
+  event_id: string | null;
+  event_date: string | Date | null;
+  away_team_id: string | null;
+  away_team_name: string | null;
+  away_team_abbreviation: string | null;
+  home_team_id: string | null;
+  home_team_name: string | null;
+  home_team_abbreviation: string | null;
+  market: Market | null;
+  selection_side: BetSide | null;
+  line: string | number | null;
   updated_at: string | Date;
 };
 type DeadTeamRow = {
@@ -349,6 +435,17 @@ export async function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
         force: row.force,
         manualOverride: row.manual_override,
         commentary: row.commentary,
+        eventId: row.event_id,
+        eventDate: row.event_date ? String(row.event_date) : null,
+        awayTeamId: row.away_team_id,
+        awayTeamName: row.away_team_name,
+        awayTeamAbbreviation: row.away_team_abbreviation,
+        homeTeamId: row.home_team_id,
+        homeTeamName: row.home_team_name,
+        homeTeamAbbreviation: row.home_team_abbreviation,
+        market: row.market,
+        selectionSide: row.selection_side,
+        line: row.line === null ? null : Number(row.line),
         updatedAt: String(row.updated_at),
       }));
     const deadTeams: RuntimeDeadTeam[] = (deadTeamRows as unknown as DeadTeamRow[])
@@ -433,16 +530,22 @@ export async function setRuntimePlayerActive(slug: string, active: boolean) {
   await sql`UPDATE ml_players SET active = ${active} WHERE slug = ${slug}`;
 }
 
-export async function upsertRuntimePick(input: Omit<RuntimePick, 'playerName' | 'result' | 'manualOverride' | 'updatedAt'>) {
+export async function upsertRuntimePick(input: RuntimePickInput) {
   const sql = await ensureDatabase();
   await sql`
     INSERT INTO ml_picks (
       season_number, week, player_slug, slot, sport, game, bet, result,
-      period, force, manual_override, commentary
+      period, force, manual_override, commentary, event_id, event_date,
+      away_team_id, away_team_name, away_team_abbreviation,
+      home_team_id, home_team_name, home_team_abbreviation,
+      market, selection_side, line
     )
     VALUES (
       ${input.seasonNumber}, ${input.week}, ${input.playerSlug}, ${input.slot}, ${input.sport},
-      ${input.game}, ${input.bet}, 'PENDING', ${input.period}, ${input.force}, false, ${input.commentary}
+      ${input.game}, ${input.bet}, 'PENDING', ${input.period}, ${input.force}, false, ${input.commentary},
+      ${input.eventId}, ${input.eventDate}, ${input.awayTeamId}, ${input.awayTeamName}, ${input.awayTeamAbbreviation},
+      ${input.homeTeamId}, ${input.homeTeamName}, ${input.homeTeamAbbreviation},
+      ${input.market}, ${input.selectionSide}, ${input.line}
     )
     ON CONFLICT (season_number, week, player_slug, slot) DO UPDATE SET
       sport = EXCLUDED.sport,
@@ -451,11 +554,24 @@ export async function upsertRuntimePick(input: Omit<RuntimePick, 'playerName' | 
       period = EXCLUDED.period,
       force = EXCLUDED.force,
       commentary = EXCLUDED.commentary,
+      event_id = EXCLUDED.event_id,
+      event_date = EXCLUDED.event_date,
+      away_team_id = EXCLUDED.away_team_id,
+      away_team_name = EXCLUDED.away_team_name,
+      away_team_abbreviation = EXCLUDED.away_team_abbreviation,
+      home_team_id = EXCLUDED.home_team_id,
+      home_team_name = EXCLUDED.home_team_name,
+      home_team_abbreviation = EXCLUDED.home_team_abbreviation,
+      market = EXCLUDED.market,
+      selection_side = EXCLUDED.selection_side,
+      line = EXCLUDED.line,
+      result = 'PENDING',
+      manual_override = false,
       updated_at = now()
   `;
 }
 
-export async function upsertRuntimePicks(inputs: Array<Omit<RuntimePick, 'playerName' | 'result' | 'manualOverride' | 'updatedAt'>>) {
+export async function upsertRuntimePicks(inputs: RuntimePickInput[]) {
   const sql = await ensureDatabase();
   const rows = JSON.stringify(inputs.map((input) => ({
     season_number: input.seasonNumber,
@@ -468,17 +584,37 @@ export async function upsertRuntimePicks(inputs: Array<Omit<RuntimePick, 'player
     period: input.period,
     force: input.force,
     commentary: input.commentary,
+    event_id: input.eventId,
+    event_date: input.eventDate,
+    away_team_id: input.awayTeamId,
+    away_team_name: input.awayTeamName,
+    away_team_abbreviation: input.awayTeamAbbreviation,
+    home_team_id: input.homeTeamId,
+    home_team_name: input.homeTeamName,
+    home_team_abbreviation: input.homeTeamAbbreviation,
+    market: input.market,
+    selection_side: input.selectionSide,
+    line: input.line,
   })));
   await sql`
     INSERT INTO ml_picks (
       season_number, week, player_slug, slot, sport, game, bet, result,
-      period, force, manual_override, commentary
+      period, force, manual_override, commentary, event_id, event_date,
+      away_team_id, away_team_name, away_team_abbreviation,
+      home_team_id, home_team_name, home_team_abbreviation,
+      market, selection_side, line
     )
-    SELECT season_number, week, player_slug, slot, sport, game, bet, 'PENDING', period, force, false, commentary
+    SELECT season_number, week, player_slug, slot, sport, game, bet, 'PENDING', period, force, false, commentary,
+      event_id, event_date, away_team_id, away_team_name, away_team_abbreviation,
+      home_team_id, home_team_name, home_team_abbreviation, market, selection_side, line
     FROM jsonb_to_recordset(${rows}::jsonb)
       AS incoming(
         season_number integer, week integer, player_slug text, slot integer,
-        sport text, game text, bet text, period text, force boolean, commentary text
+        sport text, game text, bet text, period text, force boolean, commentary text,
+        event_id text, event_date timestamptz,
+        away_team_id text, away_team_name text, away_team_abbreviation text,
+        home_team_id text, home_team_name text, home_team_abbreviation text,
+        market text, selection_side text, line numeric
       )
     ON CONFLICT (season_number, week, player_slug, slot) DO UPDATE SET
       sport = EXCLUDED.sport,
@@ -487,6 +623,19 @@ export async function upsertRuntimePicks(inputs: Array<Omit<RuntimePick, 'player
       period = EXCLUDED.period,
       force = EXCLUDED.force,
       commentary = EXCLUDED.commentary,
+      event_id = EXCLUDED.event_id,
+      event_date = EXCLUDED.event_date,
+      away_team_id = EXCLUDED.away_team_id,
+      away_team_name = EXCLUDED.away_team_name,
+      away_team_abbreviation = EXCLUDED.away_team_abbreviation,
+      home_team_id = EXCLUDED.home_team_id,
+      home_team_name = EXCLUDED.home_team_name,
+      home_team_abbreviation = EXCLUDED.home_team_abbreviation,
+      market = EXCLUDED.market,
+      selection_side = EXCLUDED.selection_side,
+      line = EXCLUDED.line,
+      result = 'PENDING',
+      manual_override = false,
       updated_at = now()
   `;
 }

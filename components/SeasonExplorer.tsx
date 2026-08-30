@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import type { RuntimeSnapshot } from '../lib/runtime-data';
 import { StatusPill } from './StatusPill';
 import { PlayerAvatar } from './PlayerAvatar';
+import { pickDisplay } from '../lib/pick-display';
 
 const weeks = Array.from({ length: 18 }, (_, index) => index + 1);
 
@@ -40,16 +41,17 @@ export function SeasonExplorer({ snapshot }: { snapshot: RuntimeSnapshot }) {
                   <div className="season-player"><PlayerAvatar name={player.name} /><strong>{player.name}</strong></div>
                   {[1, 2].map((slot) => {
                     const pick = picks.find((item) => item.slot === slot);
+                    const display = pick ? pickDisplay(pick) : null;
                     return (
                       <div key={`${player.slug}-${slot}`}>
                         <small>PICK {slot}{pick ? ` · ${pick.sport}` : ''}</small>
-                        <b>{pick?.bet ?? '—'}</b>
+                        <b>{display?.primary ?? '—'}</b>
                         <StatusPill result={pick?.result ?? 'PENDING'} />
-                        <em>{pick?.game ?? 'No pick entered'}</em>
+                        <em>{display?.secondary ?? 'No pick entered'}</em>
+                        {pick?.commentary && <em className="season-pick-call">BOOTH · {pick.commentary}</em>}
                       </div>
                     );
                   })}
-                  {picks.find((pick) => pick.commentary) && <div className="season-note">{picks.find((pick) => pick.commentary)?.commentary}</div>}
                 </article>
               );
             })}
@@ -65,14 +67,16 @@ export function SeasonExplorer({ snapshot }: { snapshot: RuntimeSnapshot }) {
             <div className="player-week-list">
               {weeks.map((number) => {
                 const picks = playerPicks.filter((pick) => pick.week === number).sort((a, b) => a.slot - b.slot);
+                const pickOne = picks.find((pick) => pick.slot === 1);
+                const pickTwo = picks.find((pick) => pick.slot === 2);
                 const wins = picks.filter((pick) => pick.result === 'W').length;
                 const losses = picks.filter((pick) => pick.result === 'L').length;
                 const pushes = picks.filter((pick) => pick.result === 'P').length;
                 return (
                   <article key={number} className={picks.length ? '' : 'future-week'}>
                     <span className="week-badge">W{number}</span>
-                    <div><small>PICK 1</small><b>{picks.find((pick) => pick.slot === 1)?.bet ?? '—'}</b></div>
-                    <div><small>PICK 2</small><b>{picks.find((pick) => pick.slot === 2)?.bet ?? '—'}</b></div>
+                    <div><small>PICK 1</small><b>{pickOne ? pickDisplay(pickOne).primary : '—'}</b></div>
+                    <div><small>PICK 2</small><b>{pickTwo ? pickDisplay(pickTwo).primary : '—'}</b></div>
                     <span className="week-record">{picks.length ? `${wins}-${losses}${pushes ? `-${pushes}` : ''}` : '—'}</span>
                   </article>
                 );

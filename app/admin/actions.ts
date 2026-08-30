@@ -10,6 +10,7 @@ import {
   deleteRuntimeDeadTeam,
   deleteRuntimeLockOff,
   deleteRuntimePick,
+  getRuntimeSnapshot,
   overrideRuntimeResult,
   resetRuntimeSeason,
   setRuntimePlayerActive,
@@ -17,8 +18,9 @@ import {
   upsertRuntimePick,
   upsertRuntimePicks,
 } from '../../lib/runtime-data';
-import { type Period, type Result, type Sport } from '../../lib/data';
+import { type BetSide, type Market, type Period, type Result, type Sport } from '../../lib/data';
 import { syncCompletedPicks } from '../../lib/score-sync';
+import { getScheduledGameById } from '../../lib/score-feed';
 
 function value(formData: FormData, key: string) {
   return String(formData.get(key) ?? '').trim();
@@ -28,6 +30,16 @@ function integer(formData: FormData, key: string, min: number, max: number) {
   const number = Number(value(formData, key));
   if (!Number.isInteger(number) || number < min || number > max) throw new Error(`Invalid ${key}.`);
   return number;
+}
+
+function boothCall(formData: FormData) {
+  const choice = value(formData, 'commentaryChoice');
+  const raw = choice === 'OTHER' ? value(formData, 'commentaryCustom') : choice;
+  return raw.replace(/\s+/g, ' ').slice(0, 80).toUpperCase();
+}
+
+function compactNumber(number: number) {
+  return Number.isInteger(number) ? String(number) : String(number);
 }
 
 function refreshPublicPages() {
@@ -94,16 +106,36 @@ export async function savePickAction(formData: FormData) {
   const playerSlug = value(formData, 'playerSlug');
   const sport = value(formData, 'sport') as Sport;
   const period = value(formData, 'period') as Period;
-  const game = value(formData, 'game').replace(/\s+/g, ' ');
-  const bet = value(formData, 'bet').replace(/\s+/g, ' ');
+  const market = value(formData, 'market') as Market;
+  const selectionSide = value(formData, 'selectionSide') as BetSide;
+  const eventId = value(formData, 'eventId');
+  const seasonNumber = integer(formData, 'seasonNumber', 1, 99);
+  const week = integer(formData, 'week', 1, 18);
   if (!/^[a-z0-9-]+$/.test(playerSlug)) throw new Error('Invalid player.');
   if (!['CFB', 'NFL'].includes(sport)) throw new Error('Invalid sport.');
   if (!['FULL', '1H', '1Q'].includes(period)) throw new Error('Invalid period.');
-  if (game.length < 3 || game.length > 120 || bet.length < 2 || bet.length > 120) throw new Error('Game and pick text are required.');
-  if (/\b(OSU|USC|MSU)\b/i.test(`${game} ${bet}`)) throw new Error('Spell out ambiguous team abbreviations before saving.');
+  if (!['SPREAD', 'TOTAL', 'MONEYLINE'].includes(market)) throw new Error('Invalid market.');
+  if (!['HOME', 'AWAY', 'OVER', 'UNDER'].includes(selectionSide)) throw new Error('Invalid pick side.');
+  if (!/^[a-z0-9-]+$/i.test(eventId)) throw new Error('Select a scheduled game before saving.');
+  if ((market === 'TOTAL') !== ['OVER', 'UNDER'].includes(selectionSide)) throw new Error('The market and pick side do not agree.');
+  const rawLine = value(formData, 'line');
+  const line = market === 'MONEYLINE' ? null : Number(rawLine);
+  if (line !== null && (!Number.isFinite(line) || line < (market === 'TOTAL' ? 0 : -100) || line > (market === 'TOTAL' ? 200 : 100))) throw new Error('Invalid line.');
+  const snapshot = await getRuntimeSnapshot();
+  if (snapshot.dataMode !== 'database' || snapshot.season.number !== seasonNumber) throw new Error('The live season could not be confirmed.');
+  const scheduledGame = await getScheduledGameById(sport, snapshot.season.startDate, week, eventId);
+  if (!scheduledGame) throw new Error('That event is not scheduled in the selected Mortal Locks week. Search and select the game again.');
+  const { away, home } = scheduledGame;
+  const selectedTeam = selectionSide === 'HOME' ? home.shortName : away.shortName;
+  const game = `${away.shortName} at ${home.shortName}`;
+  const bet = market === 'TOTAL'
+    ? `${away.shortName} / ${home.shortName} ${selectionSide === 'OVER' ? 'O' : 'U'}${compactNumber(line ?? 0)}`
+    : market === 'MONEYLINE'
+      ? `${selectedTeam} ML`
+      : `${selectedTeam} ${(line ?? 0) >= 0 ? '+' : ''}${compactNumber(line ?? 0)}`;
   await upsertRuntimePick({
-    seasonNumber: integer(formData, 'seasonNumber', 1, 99),
-    week: integer(formData, 'week', 1, 18),
+    seasonNumber,
+    week,
     playerSlug,
     slot: integer(formData, 'slot', 1, 2) as 1 | 2,
     sport,
@@ -111,7 +143,18 @@ export async function savePickAction(formData: FormData) {
     bet,
     period,
     force: value(formData, 'force') === 'on',
-    commentary: value(formData, 'commentary').slice(0, 80).toUpperCase(),
+    commentary: boothCall(formData),
+    eventId,
+    eventDate: scheduledGame.startsAt,
+    awayTeamId: away.id,
+    awayTeamName: away.shortName,
+    awayTeamAbbreviation: away.abbreviation,
+    homeTeamId: home.id,
+    homeTeamName: home.shortName,
+    homeTeamAbbreviation: home.abbreviation,
+    market,
+    selectionSide,
+    line,
   });
   refreshPublicPages();
   redirect('/admin?notice=pick-saved');
@@ -160,6 +203,17 @@ export async function saveParsedPicksAction(formData: FormData) {
       bet,
       force: false,
       commentary: String(pick.commentary ?? '').slice(0, 80).toUpperCase(),
+      eventId: null,
+      eventDate: null,
+      awayTeamId: null,
+      awayTeamName: null,
+      awayTeamAbbreviation: null,
+      homeTeamId: null,
+      homeTeamName: null,
+      homeTeamAbbreviation: null,
+      market: null,
+      selectionSide: null,
+      line: null,
     });
   }
   await upsertRuntimePicks(validated);
@@ -182,7 +236,7 @@ export async function overrideResultAction(formData: FormData) {
   }
   const result = resultChoice as Result;
   if (!['W', 'L', 'P', 'PENDING', 'LIVE'].includes(result)) throw new Error('Invalid result.');
-  const commentary = value(formData, 'commentary').slice(0, 80).toUpperCase();
+  const commentary = boothCall(formData);
   await overrideRuntimeResult({
     seasonNumber,
     week,

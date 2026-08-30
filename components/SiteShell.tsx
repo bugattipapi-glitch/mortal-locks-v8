@@ -50,9 +50,9 @@ export async function SiteShell({
             <b>{week}</b>
             <small>{resolvedSeason.status}</small>
           </div>
-          <div className="brand-logo">
+          <Link className="brand-logo" href="/" aria-label="Mortal Locks homepage">
             <Image src="/assets/mortal-locks-logo.png" alt="Mortal Locks 8 The Ocho" fill priority sizes="(max-width: 700px) 72vw, (max-width: 1000px) 54vw, 520px" />
-          </div>
+          </Link>
           <div className="brand-signal brand-signal-right" aria-hidden="true">
             <span>SIGNAL</span>
             <b>88</b>

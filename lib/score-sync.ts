@@ -14,7 +14,7 @@ export async function syncCompletedPicks(now = new Date()): Promise<ScoreSyncRes
   const snapshot = await getRuntimeSnapshot();
   if (snapshot.dataMode !== 'database') throw new Error('The live database is unavailable.');
   const pending = snapshot.picks.filter((pick) => pick.result === 'PENDING' || pick.result === 'LIVE');
-  const grades = await getCompletedPickGrades(pending, now);
+  const grades = await getCompletedPickGrades(pending, snapshot.season.startDate);
   const updated = await applyRuntimePickGrades(grades.map(({ pick, result }) => ({
     seasonNumber: pick.seasonNumber,
     week: pick.week,
@@ -31,7 +31,7 @@ export async function syncCompletedPicks(now = new Date()): Promise<ScoreSyncRes
     checked: pending.length,
     matched: grades.length,
     updated,
-    unsupported: pending.filter((pick) => pick.period !== 'FULL').length,
+    unsupported: pending.filter((pick) => !pick.eventId && pick.period !== 'FULL').length,
     grades: grades.map(({ pick, result, finalScore }) => ({
       player: pick.playerName,
       week: pick.week,

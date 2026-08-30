@@ -5,6 +5,7 @@ import { commentaryRules } from '../lib/data';
 import { getRuntimeSnapshot, type RuntimePick } from '../lib/runtime-data';
 import { buildBroadcastRecap, calculatePlayerStreaks } from '../lib/broadcast';
 import { PlayerAvatar } from '../components/PlayerAvatar';
+import { pickDisplay } from '../lib/pick-display';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,11 +14,12 @@ const featuredCalls = commentaryRules.filter(({ label }) =>
 );
 
 function pickCell(pick: RuntimePick | undefined, key: string) {
+  const display = pick ? pickDisplay(pick) : null;
   return (
     <div className={`pick-cell ${pick ? '' : 'pick-empty'}`} key={key} title={pick ? `${pick.game} · ${pick.bet}` : 'Awaiting commissioner entry'}>
       <span className="sport-tag">{pick ? `${pick.sport}${pick.period !== 'FULL' ? ` · ${pick.period}` : ''}` : 'NO SIGNAL'}</span>
       {pick?.force && <span className="force-tag">FORCE</span>}
-      <b>{pick?.bet ?? 'PICK NOT ENTERED'}</b><small>{pick?.game ?? 'Awaiting commissioner'}</small>
+      <b>{display?.primary ?? 'PICK NOT ENTERED'}</b><small>{display?.secondary ?? 'Awaiting commissioner'}</small>
     </div>
   );
 }
@@ -45,18 +47,17 @@ export default async function HomePage() {
           </div>
           <div className="picks-table desktop-table">
             <div className="pick-row pick-head">
-              <div>PLAYER</div><div>PICK 1</div><div>PICK 2</div><div>RESULTS</div><div>BOOTH CALL</div>
+              <div>PLAYER</div><div>PICK 1</div><div>RESULT</div><div>BOOTH CALL</div><div>PICK 2</div><div>RESULT</div><div>BOOTH CALL</div>
             </div>
             {weekRows.map(({ player, picks }) => (
               <div className="pick-row" key={player.slug}>
                 <div className="player-cell"><PlayerAvatar name={player.name} /><b>{player.name}</b></div>
                 {pickCell(picks.find((pick) => pick.slot === 1), `${player.slug}-1`)}
+                <div className="results-cell"><StatusPill result={picks.find((pick) => pick.slot === 1)?.result ?? 'PENDING'} /></div>
+                <div className="commentary-cell">{picks.find((pick) => pick.slot === 1)?.commentary || '—'}</div>
                 {pickCell(picks.find((pick) => pick.slot === 2), `${player.slug}-2`)}
-                <div className="results-cell">
-                  <StatusPill result={picks.find((pick) => pick.slot === 1)?.result ?? 'PENDING'} />
-                  <StatusPill result={picks.find((pick) => pick.slot === 2)?.result ?? 'PENDING'} />
-                </div>
-                <div className="commentary-cell">{picks.find((pick) => pick.commentary)?.commentary || '—'}</div>
+                <div className="results-cell"><StatusPill result={picks.find((pick) => pick.slot === 2)?.result ?? 'PENDING'} /></div>
+                <div className="commentary-cell">{picks.find((pick) => pick.slot === 2)?.commentary || '—'}</div>
               </div>
             ))}
           </div>
@@ -66,14 +67,14 @@ export default async function HomePage() {
               <article className="mobile-pick-card" key={player.slug}>
                 <div className="mobile-player">
                   <PlayerAvatar name={player.name} /><strong>{player.name}</strong>
-                  {picks.find((pick) => pick.commentary) && <em>{picks.find((pick) => pick.commentary)?.commentary}</em>}
                 </div>
                 {[1, 2].map((slot) => {
                   const pick = picks.find((item) => item.slot === slot);
+                  const display = pick ? pickDisplay(pick) : null;
                   return (
                     <div className="mobile-pick-line" key={`${player.slug}-${slot}`}>
-                      <span>{pick?.sport ?? '—'}</span>
-                      <div><b>{pick?.bet ?? 'PICK NOT ENTERED'}</b><small>{pick?.game ?? 'Awaiting commissioner'}</small></div>
+                      <span>{pick ? `${pick.sport}${pick.period !== 'FULL' ? ` · ${pick.period}` : ''}` : '—'}</span>
+                      <div><b>{display?.primary ?? 'PICK NOT ENTERED'}</b><small>{display?.secondary ?? 'Awaiting commissioner'}</small>{pick?.commentary && <em className="mobile-booth-call">BOOTH · {pick.commentary}</em>}</div>
                       <StatusPill result={pick?.result ?? 'PENDING'} />
                     </div>
                   );
