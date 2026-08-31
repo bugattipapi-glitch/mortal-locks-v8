@@ -42,16 +42,16 @@ const RESULT_LABELS: Record<Result, string> = {
 };
 
 const TEAM_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/New Mexico State/gi, 'NM ST'],
-  [/North Carolina State/gi, 'NC ST'],
+  [/New Mexico State/gi, 'NMSU'],
+  [/North Carolina State/gi, 'NCST'],
   [/South Carolina/gi, 'SC'],
   [/Florida State/gi, 'FSU'],
   [/Arizona State/gi, 'ASU'],
-  [/Michigan State/gi, 'MICH ST'],
-  [/Penn State/gi, 'PENN ST'],
+  [/Michigan State/gi, 'MSU'],
+  [/Penn State/gi, 'PSU'],
   [/Texas A&M/gi, 'TX A&M'],
   [/Notre Dame/gi, 'ND'],
-  [/Ohio State/gi, 'OHIO ST'],
+  [/Ohio State/gi, 'OSU'],
   [/Tennessee/gi, 'TENN'],
   [/Cincinnati/gi, 'CINCY'],
   [/Louisiana State/gi, 'LSU'],
@@ -60,6 +60,11 @@ const TEAM_REPLACEMENTS: Array<[RegExp, string]> = [
   [/Points?/gi, 'PTS'],
   [/Over/gi, 'O'],
   [/Under/gi, 'U'],
+  [/NM ST/gi, 'NMSU'],
+  [/NC ST/gi, 'NCST'],
+  [/MICH ST/gi, 'MSU'],
+  [/PENN ST/gi, 'PSU'],
+  [/OHIO ST/gi, 'OSU'],
 ];
 
 function lineValue(value: number | null) {
