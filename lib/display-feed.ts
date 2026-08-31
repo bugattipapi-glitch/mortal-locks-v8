@@ -5,6 +5,7 @@ import type { RuntimePick, RuntimeSnapshot } from './runtime-data';
 export type DisplayPick = {
   slot: 1 | 2;
   text: string;
+  ticker_text: string;
   result: Result;
   color: string;
   status: string;
@@ -81,22 +82,29 @@ function compact(value: string, max = 12) {
   return result.length > max ? result.slice(0, max).trimEnd() : result;
 }
 
-function structuredPickText(pick: RuntimePick) {
+function structuredPickText(pick: RuntimePick, selectedTeamMax = 7, matchupTeamMax = 4) {
   if (!pick.market || !pick.selectionSide) return null;
   const away = pick.awayTeamAbbreviation ?? pick.awayTeamName;
   const home = pick.homeTeamAbbreviation ?? pick.homeTeamName;
   if (pick.market === 'TOTAL') {
     const side = pick.selectionSide === 'OVER' ? 'O' : 'U';
-    const matchup = [away, home].filter(Boolean).map((team) => compact(String(team), 4)).join('/');
+    const matchup = [away, home]
+      .filter(Boolean)
+      .map((team) => compact(String(team), matchupTeamMax))
+      .join('/');
     return `${matchup} ${side}${pick.line ?? ''}`.trim();
   }
   const selected = pick.selectionSide === 'HOME' ? home : away;
   if (!selected) return null;
-  return `${compact(selected, 7)} ${pick.market === 'MONEYLINE' ? 'ML' : lineValue(pick.line)}`.trim();
+  return `${compact(selected, selectedTeamMax)} ${pick.market === 'MONEYLINE' ? 'ML' : lineValue(pick.line)}`.trim();
 }
 
 export function compactPickText(pick: RuntimePick) {
   return compact(structuredPickText(pick) ?? pickDisplay(pick).primary);
+}
+
+export function tickerPickText(pick: RuntimePick) {
+  return compact(structuredPickText(pick, 12, 6) ?? pickDisplay(pick).primary, 24);
 }
 
 export function buildDisplayFeed(snapshot: RuntimeSnapshot, now = new Date()): DisplayFeed {
@@ -112,6 +120,7 @@ export function buildDisplayFeed(snapshot: RuntimeSnapshot, now = new Date()): D
         .map((pick) => ({
           slot: pick.slot,
           text: compactPickText(pick),
+          ticker_text: tickerPickText(pick),
           result: pick.result,
           color: RESULT_COLORS[pick.result],
           status: RESULT_LABELS[pick.result],
