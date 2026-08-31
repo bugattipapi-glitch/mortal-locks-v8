@@ -89,5 +89,24 @@ if ('baseUrl' in (tsconfig.compilerOptions || {})) {
   failed = true;
 }
 
+const scoreSources = `${readFileSync('app/api/scores/route.ts', 'utf8')}\n${readFileSync('components/ScoreTicker.tsx', 'utf8')}\n${readFileSync('lib/data.ts', 'utf8')}`;
+for (const forbidden of ['demoScores', 'DEMO BOARD', 'osu-mich', 'tex-ou', 'lsu-clem', 'mia-fla']) {
+  if (scoreSources.includes(forbidden)) {
+    console.error(`LIVE TICKER: dummy score marker remains: ${forbidden}`);
+    failed = true;
+  }
+}
+
+const broadcastSource = readFileSync('lib/broadcast.ts', 'utf8');
+for (const requiredLine of [
+  'WELCOME, EVERYBODY, TO OPENING WEEKEND OF MORTAL LOCKS SEASON 8... THE OCHO!',
+  "THE OCHO, BABY. LET'S PLAY SOME FOOTBALL!",
+]) {
+  if (!broadcastSource.includes(requiredLine)) {
+    console.error(`OPENING BROADCAST: required line is missing: ${requiredLine}`);
+    failed = true;
+  }
+}
+
 if (failed) process.exit(1);
 console.log('Mortal Locks smoke check passed: required files, relative imports, and TS6-safe tsconfig are intact.');

@@ -126,13 +126,6 @@ export const demoStandings = [
   pct: row.wins + row.losses ? row.wins / (row.wins + row.losses) : 0
 }));
 
-export const demoScores = [
-  { id: 'osu-mich', away: 'OSU', home: 'MICH', awayScore: 21, homeScore: 17, state: '2Q 7:45', live: true },
-  { id: 'tex-ou', away: 'TEX', home: 'OU', awayScore: 30, homeScore: 27, state: '4Q 1:32', live: true },
-  { id: 'lsu-clem', away: 'LSU', home: 'CLEM', awayScore: 14, homeScore: 10, state: '3Q 2:10', live: true },
-  { id: 'mia-fla', away: 'MIA', home: 'FLA', awayScore: 17, homeScore: 20, state: 'FINAL', live: false }
-];
-
 export const commentaryRules = [
   { label: 'SOME SPREAD', detail: 'A win or loss lands within 1 point of the number.' },
   { label: 'THE MIDDLE IS ALIVE', detail: 'Opposing bets leave a gap where both players can cash.' },

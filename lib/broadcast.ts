@@ -10,14 +10,17 @@ const decided = new Set(['W', 'L', 'P']);
 
 function preseasonRecap(snapshot: RuntimeSnapshot): BroadcastRecap {
   return {
-    id: `season-${snapshot.season.number}-preseason`,
-    eyebrow: 'ML8-TV · PRESEASON SPECIAL',
+    id: `season-${snapshot.season.number}-opening-weekend`,
+    eyebrow: 'ML8-TV · SEASON 8 OPENING WEEKEND',
     lines: [
-      'WELCOME TO THIS WEEK IN MORTAL LOCKS.',
-      'LAST SEASON ENDED WITH AJ CROWNED LEAGUE CHAMPION.',
-      'IT WAS A STUNNING TURNAROUND FROM THE YEARS BEFORE.',
-      'THE TROPHY IS HIS. THE NEW BOARD IS CLEAN.',
-      "THIS YEAR, IT'S ANYONE'S LOCKS TO WIN.",
+      'WELCOME, EVERYBODY, TO OPENING WEEKEND OF MORTAL LOCKS SEASON 8... THE OCHO!',
+      'EIGHT SEASONS! YOU KNOW WHAT THAT MEANS?',
+      "IT MEANS THESE GUYS HAVE HAD SEVEN FULL YEARS TO FIGURE OUT WHAT THEY'RE DOING...",
+      "AND SOMEHOW, MOST OF 'EM STILL HAVEN'T!",
+      "WE'VE GOT COLLEGE FOOTBALL. WE'VE GOT PICKS THAT LOOK LIKE LOCKS ON SATURDAY MORNING...",
+      'AND COMPLETE DISASTERS BY SATURDAY NIGHT.',
+      'SEASON 8 STARTS RIGHT NOW.',
+      "THE OCHO, BABY. LET'S PLAY SOME FOOTBALL!",
     ],
   };
 }

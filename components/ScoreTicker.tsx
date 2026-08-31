@@ -1,9 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { demoScores } from '../lib/data';
 
-type Score = (typeof demoScores)[number] & { startsAt?: string | null };
+type Score = {
+  id: string;
+  away: string;
+  home: string;
+  awayScore: number;
+  homeScore: number;
+  state: string;
+  live: boolean;
+  startsAt?: string | null;
+};
 
 function scoreState(score: Score) {
   if (score.state !== 'SCHEDULED' || !score.startsAt) return score.state;
@@ -11,16 +19,15 @@ function scoreState(score: Score) {
 }
 
 export function ScoreTicker() {
-  const [scores, setScores] = useState<Score[]>(demoScores);
-  const [updatedAt, setUpdatedAt] = useState<string>('PREVIEW');
-  const [mode, setMode] = useState('demo');
+  const [scores, setScores] = useState<Score[]>([]);
+  const [updatedAt, setUpdatedAt] = useState<string>('CONNECTING');
+  const [mode, setMode] = useState('loading');
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch('/api/scores', { cache: 'no-store' });
-      if (!response.ok) return;
       const payload = await response.json();
       if (Array.isArray(payload.scores)) setScores(payload.scores);
       if (payload.mode) setMode(payload.mode);
@@ -41,7 +48,7 @@ export function ScoreTicker() {
   return (
     <section className="score-strip" aria-label="Picked games scoreboard">
       <div className="ticker-label">
-        <span>ML8 {mode === 'demo' ? 'PRESEASON' : 'LIVE'} TICKER · {mode === 'demo' ? 'DEMO BOARD' : mode === 'awaiting-match' ? 'MATCHING PICKED GAMES' : 'PICKED GAMES ONLY'}</span>
+        <span>ML8 LIVE TICKER · {mode === 'loading' ? 'CONNECTING TO SCORE FEED' : mode === 'awaiting-picks' ? 'AWAITING THIS WEEK\'S LOCKS' : mode === 'awaiting-match' ? 'MATCHING PICKED GAMES' : mode === 'provider-error' ? 'SCORE FEED TEMPORARILY OFFLINE' : 'PICKED GAMES ONLY'}</span>
         <button className="ticker-refresh" onClick={refresh} disabled={loading}>{loading ? 'CHECKING…' : `REFRESH · ${updatedAt}`}</button>
       </div>
       <div className="score-scroll">
@@ -51,7 +58,7 @@ export function ScoreTicker() {
             <div><b>{score.away}</b> {score.awayScore}</div>
             <div><b>{score.home}</b> {score.homeScore}</div>
           </div>
-        )) : <div className="score-chip score-awaiting"><div className="score-state">FEED READY</div><div><b>AWAITING MATCHED GAMES</b></div></div>}
+        )) : <div className="score-chip score-awaiting"><div className="score-state">{mode === 'provider-error' ? 'RETRYING' : 'FEED READY'}</div><div><b>{mode === 'loading' ? 'CONNECTING TO LIVE SCORES' : mode === 'awaiting-match' ? 'MATCHING SAVED LOCKS' : mode === 'provider-error' ? 'LIVE SCORES TEMPORARILY UNAVAILABLE' : 'AWAITING THIS WEEK\'S LOCKS'}</b></div></div>}
       </div>
     </section>
   );
