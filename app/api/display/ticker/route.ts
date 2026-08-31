@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const cards: TickerCard[] = feed.pages.flatMap((page) =>
     page.picks.map((pick) => ({
       player: page.player,
-      text: pick.text,
+      text: pick.ticker_text,
       status: pick.result,
     })),
   );
