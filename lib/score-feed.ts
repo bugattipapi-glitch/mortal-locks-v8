@@ -12,6 +12,25 @@ export type TickerScore = {
   startsAt: string | null;
 };
 
+export type WatchedTeamKey = 'texas' | 'arizona' | 'packers';
+
+export type WatchedTeamGame = {
+  key: WatchedTeamKey;
+  eventId: string;
+  startsAt: string;
+  team: string;
+  abbreviation: string;
+  opponent: string;
+  opponentAbbreviation: string;
+  homeAway: 'home' | 'away';
+  score: number;
+  opponentScore: number;
+  state: 'pre' | 'in' | 'post';
+  detail: string;
+  live: boolean;
+  completed: boolean;
+};
+
 export type ScheduleTeam = {
   id: string;
   name: string;
@@ -92,6 +111,11 @@ type EspnScoreboard = { events?: EspnEvent[] };
 type EspnTeamsFeed = { sports?: Array<{ leagues?: Array<{ teams?: Array<{ team?: EspnTeam }> }> }> };
 
 const SCOREBOARD = 'https://site.api.espn.com/apis/site/v2/sports/football';
+const watchedTeams = {
+  texas: { id: '251', league: 'college-football', label: 'TEXAS' },
+  arizona: { id: '12', league: 'college-football', label: 'ARIZONA' },
+  packers: { id: '9', league: 'nfl', label: 'PACKERS' },
+} as const satisfies Record<WatchedTeamKey, { id: string; league: 'nfl' | 'college-football'; label: string }>;
 const ignoredTokens = new Set(['at', 'the', 'vs', 'versus', 'university', 'college', 'football', 'state']);
 const teamAliases: Record<string, string[]> = {
   '49ers': ['san francisco', 'sf'],
@@ -226,13 +250,13 @@ export function weekDateRange(startDate: string, week: number) {
   };
 }
 
-async function fetchLeague(league: 'nfl' | 'college-football', dates: string) {
+async function fetchLeague(league: 'nfl' | 'college-football', dates: string, revalidate = 60) {
   let failure: unknown;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const response = await fetch(`${SCOREBOARD}/${league}/scoreboard?dates=${dates}&limit=100`, {
         headers: { accept: 'application/json' },
-        next: { revalidate: 60 },
+        next: { revalidate },
         signal: AbortSignal.timeout(8_000),
       });
       if (!response.ok) throw new Error(`Score provider returned ${response.status} for ${league}.`);
@@ -242,6 +266,61 @@ async function fetchLeague(league: 'nfl' | 'college-football', dates: string) {
     }
   }
   throw failure instanceof Error ? failure : new Error(`Score provider failed for ${league}.`);
+}
+
+function watchedGameFromEvent(event: EspnEvent, key: WatchedTeamKey): WatchedTeamGame | null {
+  const watched = watchedTeams[key];
+  const competition = event.competitions?.[0];
+  const competitors = competition?.competitors ?? [];
+  const team = competitors.find((competitor) => competitor.team?.id === watched.id);
+  const opponent = competitors.find((competitor) => competitor !== team);
+  const type = competition?.status?.type;
+  if (!event.id || !event.date || !team?.team || !opponent?.team || !type?.state) return null;
+  const teamName = team.team.shortDisplayName ?? team.team.displayName ?? watched.label;
+  const opponentName = opponent.team.shortDisplayName ?? opponent.team.displayName ?? 'OPPONENT';
+  return {
+    key,
+    eventId: event.id,
+    startsAt: event.date,
+    team: watched.label,
+    abbreviation: team.team.abbreviation ?? teamName.slice(0, 5).toUpperCase(),
+    opponent: opponentName,
+    opponentAbbreviation: opponent.team.abbreviation ?? opponentName.slice(0, 5).toUpperCase(),
+    homeAway: team.homeAway ?? 'home',
+    score: Number(team.score ?? 0),
+    opponentScore: Number(opponent.score ?? 0),
+    state: type.state === 'in' ? 'in' : type.state === 'post' ? 'post' : 'pre',
+    detail: type.shortDetail ?? type.detail ?? (type.state === 'pre' ? 'SCHEDULED' : 'LIVE'),
+    live: type.state === 'in' && !type.completed,
+    completed: Boolean(type.completed),
+  };
+}
+
+function watchedGamesFromEvents(date: string, collegeEvents: EspnEvent[], nflEvents: EspnEvent[]) {
+  const weekday = new Date(`${date}T12:00:00.000Z`).getUTCDay();
+  const keys: WatchedTeamKey[] = weekday === 6
+    ? ['texas', 'arizona']
+    : weekday === 0
+      ? ['packers']
+      : [];
+  return keys.flatMap((key) => {
+    const events = watchedTeams[key].league === 'nfl' ? nflEvents : collegeEvents;
+    const event = events.find((candidate) => candidate.competitions?.[0]?.competitors?.some(
+      (competitor) => competitor.team?.id === watchedTeams[key].id,
+    ));
+    const game = event ? watchedGameFromEvent(event, key) : null;
+    return game ? [game] : [];
+  });
+}
+
+export async function getWatchedTeamGames(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Invalid watched-team date.');
+  const dates = date.replaceAll('-', '');
+  const [collegeFeed, nflFeed] = await Promise.all([
+    fetchLeague('college-football', dates, 15),
+    fetchLeague('nfl', dates, 15),
+  ]);
+  return watchedGamesFromEvents(date, collegeFeed.events ?? [], nflFeed.events ?? []);
 }
 
 async function fetchTeamDirectory(sport: Sport) {
@@ -460,4 +539,11 @@ export async function getCompletedPickGrades(picks: RuntimePick[], seasonStartDa
   });
 }
 
-export const scoreFeedInternals = { matchesPick, matchingEventsForPick, gradeCompletedEvent, weekDateRange };
+export const scoreFeedInternals = {
+  matchesPick,
+  matchingEventsForPick,
+  gradeCompletedEvent,
+  weekDateRange,
+  watchedGameFromEvent,
+  watchedGamesFromEvents,
+};

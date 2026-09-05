@@ -8,7 +8,7 @@ let source = await readFile(new URL('../lib/score-feed.ts', import.meta.url), 'u
 source = source
   .replace("import type { Period, Result, Sport } from './data';", "type Result = 'W' | 'L' | 'P' | 'PENDING' | 'LIVE'; type Period = 'FULL' | '1H' | '1Q'; type Sport = 'CFB' | 'NFL';")
   .replace("import type { RuntimePick } from './runtime-data';", 'type RuntimePick = any;')
-  .replaceAll(/next: \{ revalidate: [0-9_]+ \},/g, '');
+  .replaceAll(/next: \{ revalidate(?:: [0-9_]+)? \},/g, '');
 const checkDir = await mkdtemp(join(tmpdir(), 'ml8-score-feed-'));
 const sourcePath = join(checkDir, 'score-feed.ts');
 await writeFile(sourcePath, source);
@@ -130,6 +130,20 @@ const structuredPick = {
 };
 assert.equal(scoreFeedInternals.gradeCompletedEvent(event(17, 20), structuredPick).result, 'W');
 assert.deepEqual(scoreFeedInternals.weekDateRange('2026-08-29', 1), { startDate: '2026-08-25', endDate: '2026-08-31', query: '20260825-20260831' });
+
+const texasSaturday = event(0, 0, false, {
+  id: '401856667',
+  away: { id: '326', displayName: 'Texas State Bobcats', shortDisplayName: 'Texas State', abbreviation: 'TXST' },
+  home: { id: '251', displayName: 'Texas Longhorns', shortDisplayName: 'Texas', abbreviation: 'TEX' },
+});
+texasSaturday.date = '2026-09-05T19:30:00Z';
+texasSaturday.competitions[0].status.type.state = 'pre';
+texasSaturday.competitions[0].status.type.shortDetail = '9/5 - 12:30 PM MST';
+const watchedSaturday = scoreFeedInternals.watchedGamesFromEvents('2026-09-05', [texasSaturday], []);
+assert.deepEqual(watchedSaturday.map(({ key }) => key), ['texas']);
+assert.equal(watchedSaturday[0].opponentAbbreviation, 'TXST');
+assert.equal(watchedSaturday[0].startsAt, '2026-09-05T19:30:00Z');
+assert.deepEqual(scoreFeedInternals.watchedGamesFromEvents('2026-09-07', [texasSaturday], []), []);
 
 const singleTeamPick = pick('Under 40', 'Bears');
 assert.deepEqual(scoreFeedInternals.matchingEventsForPick([bearsTitans, event(10, 10, false)], singleTeamPick).map(({ id }) => id), ['401874394']);

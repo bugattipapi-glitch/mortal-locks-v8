@@ -17,6 +17,7 @@ const required = [
   'app/api/display/route.ts',
   'app/api/display/picks/route.tsx',
   'app/api/display/ticker/route.ts',
+  'app/api/display/teams/route.ts',
   'app/api/admin/games/route.ts',
   'app/api/cron/grade-picks/route.ts',
   'components/SiteShell.tsx',
