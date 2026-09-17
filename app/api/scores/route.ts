@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getRuntimeSnapshot } from '../../../lib/runtime-data';
+import { getPublicRuntimeSnapshot } from '../../../lib/runtime-cache';
 import { getPickedGameScores } from '../../../lib/score-feed';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const updatedAt = new Date().toISOString();
-  const snapshot = await getRuntimeSnapshot();
+  const snapshot = await getPublicRuntimeSnapshot();
   const currentPicks = snapshot.picks.filter((pick) => pick.week === snapshot.season.currentWeek);
   if (!currentPicks.length) return NextResponse.json({ mode: 'awaiting-picks', updatedAt, scores: [] });
   try {

@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache';
 import { applyRuntimePickGrades, getRuntimeSnapshot } from './runtime-data';
+import { invalidateRuntimeCache } from './runtime-cache';
 import { getCompletedPickGrades } from './score-feed';
 
 export type ScoreSyncResult = {
@@ -23,6 +24,7 @@ export async function syncCompletedPicks(now = new Date()): Promise<ScoreSyncRes
     result,
   })));
   if (updated) {
+    invalidateRuntimeCache();
     revalidatePath('/');
     revalidatePath('/season');
     revalidatePath('/admin');

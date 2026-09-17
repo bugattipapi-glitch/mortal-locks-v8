@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { buildDisplayFeed, type DisplayPage } from '../../../../lib/display-feed';
-import { getRuntimeSnapshot } from '../../../../lib/runtime-data';
+import { getPublicRuntimeSnapshot } from '../../../../lib/runtime-cache';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,7 +82,7 @@ function EmptyPage({ message }: { message: string }) {
 }
 
 export async function GET(request: Request) {
-  const feed = buildDisplayFeed(await getRuntimeSnapshot());
+  const feed = buildDisplayFeed(await getPublicRuntimeSnapshot());
   const requestedPage = Number.parseInt(new URL(request.url).searchParams.get('page') ?? '0', 10);
   const pageIndex = Number.isFinite(requestedPage) && requestedPage >= 0 ? requestedPage : 0;
   const page = feed.pages[pageIndex];

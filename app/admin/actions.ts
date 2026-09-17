@@ -19,6 +19,7 @@ import {
   upsertRuntimePicks,
 } from '../../lib/runtime-data';
 import { type BetSide, type Market, type Period, type Result, type Sport } from '../../lib/data';
+import { invalidateRuntimeCache } from '../../lib/runtime-cache';
 import { syncCompletedPicks } from '../../lib/score-sync';
 import { getScheduledGameById } from '../../lib/score-feed';
 
@@ -43,6 +44,7 @@ function compactNumber(number: number) {
 }
 
 function refreshPublicPages() {
+  invalidateRuntimeCache();
   revalidatePath('/');
   revalidatePath('/season');
   revalidatePath('/admin');

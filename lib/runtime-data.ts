@@ -386,7 +386,9 @@ type LockOffRow = {
   created_at: string | Date;
 };
 
-export async function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
+export async function getRuntimeSnapshot(
+  { fallbackOnError = true }: { fallbackOnError?: boolean } = {},
+): Promise<RuntimeSnapshot> {
   if (!getSql()) return previewSnapshot();
 
   try {
@@ -471,6 +473,7 @@ export async function getRuntimeSnapshot(): Promise<RuntimeSnapshot> {
     return { season, players, picks, deadTeams, lockOffs, standings: calculateStandings(players, picks), dataMode: 'database' };
   } catch (error) {
     console.error('Mortal Locks database fallback:', error);
+    if (!fallbackOnError) throw error;
     return previewSnapshot();
   }
 }

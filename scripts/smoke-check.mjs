@@ -40,6 +40,7 @@ const required = [
   'lib/hall-of-fame.ts',
   'lib/history.ts',
   'lib/runtime-data.ts',
+  'lib/runtime-cache.ts',
   'lib/score-feed.ts',
   'lib/score-sync.ts',
   'lib/pick-text-parser.ts',
@@ -94,6 +95,35 @@ const scoreSources = `${readFileSync('app/api/scores/route.ts', 'utf8')}\n${read
 for (const forbidden of ['demoScores', 'DEMO BOARD', 'osu-mich', 'tex-ou', 'lsu-clem', 'mia-fla']) {
   if (scoreSources.includes(forbidden)) {
     console.error(`LIVE TICKER: dummy score marker remains: ${forbidden}`);
+    failed = true;
+  }
+}
+
+const runtimeCacheSource = readFileSync('lib/runtime-cache.ts', 'utf8');
+for (const requiredMarker of ['unstable_cache', 'getPublicRuntimeSnapshot', 'revalidate: 21_600', 'expire: 0']) {
+  if (!runtimeCacheSource.includes(requiredMarker)) {
+    console.error(`RUNTIME CACHE: required safeguard is missing: ${requiredMarker}`);
+    failed = true;
+  }
+}
+
+for (const publicConsumer of [
+  'app/page.tsx',
+  'app/season/page.tsx',
+  'app/api/scores/route.ts',
+  'app/api/display/route.ts',
+  'app/api/display/picks/route.tsx',
+  'app/api/display/ticker/route.ts',
+]) {
+  if (!readFileSync(publicConsumer, 'utf8').includes('getPublicRuntimeSnapshot')) {
+    console.error(`RUNTIME CACHE: public data consumer bypasses the shared snapshot: ${publicConsumer}`);
+    failed = true;
+  }
+}
+
+for (const invalidator of ['app/admin/actions.ts', 'lib/score-sync.ts']) {
+  if (!readFileSync(invalidator, 'utf8').includes('invalidateRuntimeCache')) {
+    console.error(`RUNTIME CACHE: mutation path does not invalidate the shared snapshot: ${invalidator}`);
     failed = true;
   }
 }

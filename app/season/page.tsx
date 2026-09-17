@@ -1,10 +1,11 @@
 import { SeasonExplorer } from '../../components/SeasonExplorer';
 import { SiteShell } from '../../components/SiteShell';
-import { getRuntimeSnapshot } from '../../lib/runtime-data';
+import { buildBroadcastRecap } from '../../lib/broadcast';
+import { getPublicRuntimeSnapshot } from '../../lib/runtime-cache';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 21_600;
 
 export default async function SeasonPage() {
-  const snapshot = await getRuntimeSnapshot();
-  return <SiteShell active="season" seasonInfo={snapshot.season}><SeasonExplorer snapshot={snapshot} /></SiteShell>;
+  const snapshot = await getPublicRuntimeSnapshot();
+  return <SiteShell active="season" seasonInfo={snapshot.season} recap={buildBroadcastRecap(snapshot)}><SeasonExplorer snapshot={snapshot} /></SiteShell>;
 }

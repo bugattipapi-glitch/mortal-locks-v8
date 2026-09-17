@@ -2,12 +2,13 @@ import Link from 'next/link';
 import { SiteShell } from '../components/SiteShell';
 import { StatusPill } from '../components/StatusPill';
 import { commentaryRules } from '../lib/data';
-import { getRuntimeSnapshot, type RuntimePick } from '../lib/runtime-data';
+import { type RuntimePick } from '../lib/runtime-data';
+import { getPublicRuntimeSnapshot } from '../lib/runtime-cache';
 import { buildBroadcastRecap, calculatePlayerStreaks } from '../lib/broadcast';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { pickDisplay } from '../lib/pick-display';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 21_600;
 
 const featuredCalls = commentaryRules.filter(({ label }) =>
   ['SOME SPREAD', 'PUSH JOB', 'THE MIDDLE IS ALIVE'].includes(label),
@@ -25,7 +26,7 @@ function pickCell(pick: RuntimePick | undefined, key: string) {
 }
 
 export default async function HomePage() {
-  const snapshot = await getRuntimeSnapshot();
+  const snapshot = await getPublicRuntimeSnapshot();
   const activePlayers = snapshot.players.filter((player) => player.active);
   const recap = buildBroadcastRecap(snapshot);
   const streaks = calculatePlayerStreaks(snapshot);

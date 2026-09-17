@@ -3,7 +3,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { connection } from 'next/server';
 import { season } from '../lib/data';
-import { getRuntimeSnapshot, type RuntimeSeason } from '../lib/runtime-data';
+import { type RuntimeSeason } from '../lib/runtime-data';
+import { getPublicRuntimeSnapshot } from '../lib/runtime-cache';
 import { buildBroadcastRecap, type BroadcastRecap as BroadcastRecapData } from '../lib/broadcast';
 import { ScoreTicker } from './ScoreTicker';
 import { StandingsNavLink } from './StandingsNavLink';
@@ -34,7 +35,7 @@ export async function SiteShell({
   let resolvedRecap = recap;
   if (!resolvedSeason || !resolvedRecap) {
     await connection();
-    const snapshot = await getRuntimeSnapshot();
+    const snapshot = await getPublicRuntimeSnapshot();
     resolvedSeason ??= snapshot.season;
     resolvedRecap ??= buildBroadcastRecap(snapshot);
   }

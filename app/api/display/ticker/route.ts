@@ -1,11 +1,11 @@
 import { buildDisplayFeed } from '../../../../lib/display-feed';
 import { renderTickerGif, type TickerCard } from '../../../../lib/pixel-gif';
-import { getRuntimeSnapshot } from '../../../../lib/runtime-data';
+import { getPublicRuntimeSnapshot } from '../../../../lib/runtime-cache';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const feed = buildDisplayFeed(await getRuntimeSnapshot());
+  const feed = buildDisplayFeed(await getPublicRuntimeSnapshot());
   const cards: TickerCard[] = feed.pages.flatMap((page) =>
     page.picks.map((pick) => ({
       player: page.player,
