@@ -130,6 +130,21 @@ const structuredPick = {
 };
 assert.equal(scoreFeedInternals.gradeCompletedEvent(event(17, 20), structuredPick).result, 'W');
 assert.deepEqual(scoreFeedInternals.weekDateRange('2026-08-29', 1), { startDate: '2026-08-25', endDate: '2026-08-31', query: '20260825-20260831' });
+assert.deepEqual(scoreFeedInternals.weekDateKeys('2026-09-05', 3), [
+  '20260915',
+  '20260916',
+  '20260917',
+  '20260918',
+  '20260919',
+  '20260920',
+  '20260921',
+]);
+
+const repeatedEvent = event(10, 7, false, { id: 'same-event' });
+assert.deepEqual(
+  scoreFeedInternals.uniqueEvents([{ events: [repeatedEvent] }, { events: [repeatedEvent] }]).map(({ id }) => id),
+  ['same-event'],
+);
 
 const texasSaturday = event(0, 0, false, {
   id: '401856667',

@@ -250,6 +250,21 @@ export function weekDateRange(startDate: string, week: number) {
   };
 }
 
+function weekDateKeys(startDate: string, week: number) {
+  const range = weekDateRange(startDate, week);
+  const date = new Date(`${range.startDate}T12:00:00.000Z`);
+  return Array.from({ length: 7 }, (_, index) => {
+    const current = new Date(date);
+    current.setUTCDate(current.getUTCDate() + index);
+    return dateKey(current).replaceAll('-', '');
+  });
+}
+
+function uniqueEvents(feeds: EspnScoreboard[]) {
+  const events = feeds.flatMap((feed) => feed.events ?? []);
+  return [...new Map(events.map((event) => [event.id ?? `${event.date}:${event.name}`, event])).values()];
+}
+
 async function fetchLeague(league: 'nfl' | 'college-football', dates: string, revalidate = 60) {
   let failure: unknown;
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -337,8 +352,13 @@ async function fetchTeamDirectory(sport: Sport) {
 
 async function fetchWeekEvents(sport: Sport, seasonStartDate: string, week: number) {
   const league = sport === 'NFL' ? 'nfl' : 'college-football';
-  const feed = await fetchLeague(league, weekDateRange(seasonStartDate, week).query);
-  return feed.events ?? [];
+  // ESPN now rejects the former `YYYYMMDD-YYYYMMDD` range query with HTTP 400.
+  // Single-date scoreboard queries remain supported, so fetch the seven Mortal
+  // Locks dates in parallel and merge any duplicate events returned by ESPN.
+  const feeds = await Promise.all(
+    weekDateKeys(seasonStartDate, week).map((date) => fetchLeague(league, date)),
+  );
+  return uniqueEvents(feeds);
 }
 
 function scheduledGameFromEvent(event: EspnEvent, sport: Sport): ScheduledGame | null {
@@ -544,6 +564,8 @@ export const scoreFeedInternals = {
   matchingEventsForPick,
   gradeCompletedEvent,
   weekDateRange,
+  weekDateKeys,
+  uniqueEvents,
   watchedGameFromEvent,
   watchedGamesFromEvents,
 };
