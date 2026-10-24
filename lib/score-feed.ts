@@ -340,7 +340,7 @@ export async function getWatchedTeamGames(date: string) {
 
 async function fetchTeamDirectory(sport: Sport) {
   const league = sport === 'NFL' ? 'nfl' : 'college-football';
-  const response = await fetch(`${SCOREBOARD}/${league}/teams?limit=500`, {
+  const response = await fetch(`${SCOREBOARD}/${league}/teams?limit=1000`, {
     headers: { accept: 'application/json' },
     next: { revalidate: 86_400 },
     signal: AbortSignal.timeout(8_000),
@@ -348,6 +348,14 @@ async function fetchTeamDirectory(sport: Sport) {
   if (!response.ok) throw new Error(`Team directory returned ${response.status} for ${league}.`);
   const feed = await response.json() as EspnTeamsFeed;
   return feed.sports?.flatMap((sportEntry) => sportEntry.leagues ?? []).flatMap((leagueEntry) => leagueEntry.teams ?? []).flatMap((entry) => entry.team ? [entry.team] : []) ?? [];
+}
+
+function teamsFromEvents(events: EspnEvent[]) {
+  return events.flatMap((event) => event.competitions?.[0]?.competitors ?? []).flatMap((competitor) => competitor.team ? [competitor.team] : []);
+}
+
+function uniqueTeams(teams: EspnTeam[]) {
+  return [...new Map(teams.flatMap((team) => team.id ? [[team.id, team] as const] : [])).values()];
 }
 
 async function fetchWeekEvents(sport: Sport, seasonStartDate: string, week: number) {
@@ -404,7 +412,11 @@ export async function searchScheduleCandidates(query: string, seasonStartDate: s
   ]);
   const candidates: ScheduleCandidate[] = [];
   for (const [sport, events, teams] of [['NFL', nflEvents, nflTeams], ['CFB', cfbEvents, cfbTeams]] as const) {
-    for (const rawTeam of teams) {
+    // Scoreboard competitors are the source of truth for teams actually playing
+    // this week. Merge them into the directory so a truncated or stale directory
+    // can never hide a selectable game.
+    const searchableTeams = uniqueTeams([...teamsFromEvents(events), ...teams]);
+    for (const rawTeam of searchableTeams) {
       const matchedTeam = teamFromEspnTeam(rawTeam);
       if (!matchedTeam) continue;
       const searchable = normalized(`${matchedTeam.name} ${matchedTeam.shortName} ${matchedTeam.abbreviation} ${rawTeam.location ?? ''}`);
@@ -431,8 +443,17 @@ export async function searchScheduleCandidates(query: string, seasonStartDate: s
     }
   }
   return candidates
-    .sort((left, right) => left.matchedTeam.name.localeCompare(right.matchedTeam.name) || String(left.startsAt).localeCompare(String(right.startsAt)))
-    .slice(0, 16);
+    .sort((left, right) => {
+      if (left.available !== right.available) return left.available ? -1 : 1;
+      const leftName = normalized(left.matchedTeam.name);
+      const rightName = normalized(right.matchedTeam.name);
+      const leftExact = leftName === needle ? 0 : leftName.startsWith(needle) ? 1 : 2;
+      const rightExact = rightName === needle ? 0 : rightName.startsWith(needle) ? 1 : 2;
+      return leftExact - rightExact
+        || left.matchedTeam.name.localeCompare(right.matchedTeam.name)
+        || String(left.startsAt).localeCompare(String(right.startsAt));
+    })
+    .slice(0, 24);
 }
 
 function compare(value: number): Extract<Result, 'W' | 'L' | 'P'> {
@@ -566,6 +587,8 @@ export const scoreFeedInternals = {
   weekDateRange,
   weekDateKeys,
   uniqueEvents,
+  teamsFromEvents,
+  uniqueTeams,
   watchedGameFromEvent,
   watchedGamesFromEvents,
 };

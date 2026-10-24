@@ -128,7 +128,7 @@ export function GamePickEntry({
         {candidates.map((candidate) => {
           const hasGame = candidate.available && !!candidate.away && !!candidate.home && !!candidate.startsAt && !!candidate.eventId;
           return <button type="button" role="option" aria-selected="false" disabled={!hasGame} onClick={() => chooseCandidate(candidate)} key={`${candidate.sport}-${candidate.eventId ?? 'bye'}-${candidate.matchedTeam.id}`}>
-              <span><b>{candidate.matchedTeam.name}</b><small>{candidate.sport} · {candidate.matchedTeam.abbreviation}</small></span>
+              <span><b>{candidate.matchedTeam.name}</b><small>{candidate.sport} · {candidate.matchedTeam.abbreviation} · {hasGame ? 'GAME THIS WEEK' : 'NOT PLAYING'}</small></span>
               {hasGame
                 ? <span><strong>{candidate.away!.shortName} at {candidate.home!.shortName}</strong><small>{localKickoff(candidate.startsAt!)}</small></span>
                 : <span><strong>NO GAME THIS WEEK</strong><small>Choose another team or Mortal Locks week</small></span>}

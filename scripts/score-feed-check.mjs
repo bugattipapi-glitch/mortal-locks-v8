@@ -146,6 +146,24 @@ assert.deepEqual(
   ['same-event'],
 );
 
+const activeTeamEvent = event(0, 0, false, {
+  id: 'directory-gap-event',
+  away: { id: '2633', displayName: 'Tennessee Volunteers', shortDisplayName: 'Tennessee', abbreviation: 'TENN' },
+  home: { id: '2579', displayName: 'South Carolina Gamecocks', shortDisplayName: 'South Carolina', abbreviation: 'SC' },
+});
+assert.deepEqual(
+  scoreFeedInternals.teamsFromEvents([activeTeamEvent]).map(({ id }) => id),
+  ['2633', '2579'],
+);
+assert.deepEqual(
+  scoreFeedInternals.uniqueTeams([
+    { id: '2633', displayName: 'Tennessee Volunteers' },
+    { id: '2633', displayName: 'Duplicate Tennessee' },
+    { id: '2711', displayName: 'Western Michigan Broncos' },
+  ]).map(({ displayName }) => displayName),
+  ['Duplicate Tennessee', 'Western Michigan Broncos'],
+);
+
 const texasSaturday = event(0, 0, false, {
   id: '401856667',
   away: { id: '326', displayName: 'Texas State Bobcats', shortDisplayName: 'Texas State', abbreviation: 'TXST' },
