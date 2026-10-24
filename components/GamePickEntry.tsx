@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { savePickAction } from '../app/admin/actions';
 import { commentaryRules, type BetSide, type Market, type Period } from '../lib/data';
-import type { RuntimePlayer } from '../lib/runtime-data';
+import type { RuntimePick, RuntimePlayer } from '../lib/runtime-data';
 import type { ScheduleCandidate, ScheduledGameCandidate } from '../lib/score-feed';
 
 function signedLine(value: string) {
@@ -16,17 +16,46 @@ function localKickoff(value: string) {
   return new Date(value).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+function preferredSlot(picks: RuntimePick[], week: string, playerSlug: string): '1' | '2' {
+  const playerPicks = picks.filter((pick) => pick.week === Number(week) && pick.playerSlug === playerSlug);
+  const hasPickOne = playerPicks.some((pick) => pick.slot === 1);
+  const hasPickTwo = playerPicks.some((pick) => pick.slot === 2);
+
+  if (hasPickOne && !hasPickTwo) return '2';
+  if (hasPickTwo && !hasPickOne) return '1';
+  return hasPickOne ? '2' : '1';
+}
+
+function preferredPlayerSlug(players: RuntimePlayer[], picks: RuntimePick[], week: string) {
+  const weekNumber = Number(week);
+  const firstIncompletePlayer = players.find((player) => {
+    const occupiedSlots = new Set(
+      picks
+        .filter((pick) => pick.week === weekNumber && pick.playerSlug === player.slug)
+        .map((pick) => pick.slot),
+    );
+    return occupiedSlots.size < 2;
+  });
+
+  return firstIncompletePlayer?.slug ?? players[0]?.slug ?? '';
+}
+
 export function GamePickEntry({
   players,
+  picks,
   seasonNumber,
   week,
   onWeekChange,
 }: {
   players: RuntimePlayer[];
+  picks: RuntimePick[];
   seasonNumber: number;
   week: string;
   onWeekChange: (week: string) => void;
 }) {
+  const initialPlayerSlug = preferredPlayerSlug(players, picks, week);
+  const [playerSlug, setPlayerSlug] = useState(initialPlayerSlug);
+  const [slot, setSlot] = useState<'1' | '2'>(() => preferredSlot(picks, week, initialPlayerSlug));
   const [query, setQuery] = useState('');
   const [candidates, setCandidates] = useState<ScheduleCandidate[]>([]);
   const [selected, setSelected] = useState<ScheduledGameCandidate | null>(null);
@@ -37,12 +66,6 @@ export function GamePickEntry({
   const [line, setLine] = useState('');
   const [period, setPeriod] = useState<Period>('FULL');
   const [commentaryChoice, setCommentaryChoice] = useState('');
-
-  useEffect(() => {
-    setSelected(null);
-    setCandidates([]);
-    setQuery('');
-  }, [week]);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -105,6 +128,11 @@ export function GamePickEntry({
     else setSelectionSide(selected?.matchedTeamSide ?? 'HOME');
   }
 
+  function changePlayer(nextPlayerSlug: string) {
+    setPlayerSlug(nextPlayerSlug);
+    setSlot(preferredSlot(picks, week, nextPlayerSlug));
+  }
+
   return (
     <form className="admin-section canonical-pick-entry" action={savePickAction}>
       <h2>FIND GAME + ENTER LOCK</h2>
@@ -112,8 +140,8 @@ export function GamePickEntry({
       <input type="hidden" name="seasonNumber" value={seasonNumber} />
       <div className="admin-form-grid">
         <label>Week<select name="week" value={week} onChange={(event) => onWeekChange(event.target.value)}>{Array.from({ length: 18 }, (_, index) => index + 1).map((number) => <option key={number} value={number}>Week {number}</option>)}</select></label>
-        <label>Player<select name="playerSlug" required>{players.map((player) => <option key={player.slug} value={player.slug}>{player.name}</option>)}</select></label>
-        <label>Pick slot<select name="slot"><option value="1">Pick 1</option><option value="2">Pick 2</option></select></label>
+        <label>Player<select name="playerSlug" value={playerSlug} onChange={(event) => changePlayer(event.target.value)} required>{players.map((player) => <option key={player.slug} value={player.slug}>{player.name}</option>)}</select></label>
+        <label>Pick slot<select name="slot" value={slot} onChange={(event) => setSlot(event.target.value as '1' | '2')}><option value="1">Pick 1</option><option value="2">Pick 2</option></select></label>
         <label>Period<select name="period" value={period} onChange={(event) => setPeriod(event.target.value as Period)}><option value="FULL">Full game</option><option value="1H">1st half</option><option value="1Q">1st quarter</option></select></label>
       </div>
 

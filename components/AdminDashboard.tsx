@@ -201,7 +201,7 @@ export function AdminDashboard({ snapshot, notice }: { snapshot: RuntimeSnapshot
           </form>
           <p className="helper">If any line says CHECK, edit the pasted text or use the structured entry form below. Nothing partial is imported.</p>
         </div>
-        <GamePickEntry players={activePlayers} seasonNumber={snapshot.season.number} week={week} onWeekChange={setWeek} />
+        <GamePickEntry key={week} players={activePlayers} picks={snapshot.picks} seasonNumber={snapshot.season.number} week={week} onWeekChange={setWeek} />
 
         <div className="admin-section">
           <h2>RESULT OVERRIDE · WEEK {week}</h2>
