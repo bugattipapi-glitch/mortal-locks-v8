@@ -4,7 +4,7 @@ const avatarByPlayer: Record<string, string> = {
   aj: '/assets/avatars/aj.png',
   blaine: '/assets/avatars/blaine.png',
   brad: '/assets/avatars/brad.png',
-  ceci: '/assets/avatars/ceci.png',
+  ceci: '/assets/avatars/ceci-gold-helmet.png',
   jay: '/assets/avatars/jay.png',
   joe: '/assets/avatars/joe.png',
   kev: '/assets/avatars/kev.png',
